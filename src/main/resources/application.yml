@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: shortlink
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/shortlink}
+    username: ${SPRING_DATASOURCE_USERNAME:shortlink}
+    password: ${SPRING_DATASOURCE_PASSWORD:shortlink}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}

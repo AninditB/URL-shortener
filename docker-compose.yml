@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: shortlink-postgres
+    environment:
+      POSTGRES_DB: shortlink
+      POSTGRES_USER: shortlink
+      POSTGRES_PASSWORD: shortlink
+    ports:
+      - "5432:5432"
+    volumes:
+      - shortlink-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  shortlink-postgres-data:
