@@ -1,6 +1,5 @@
 package com.aninditb.shortlink.controller;
 
-import com.aninditb.shortlink.entity.ShortUrl;
 import com.aninditb.shortlink.exception.UrlExpiredException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
 import com.aninditb.shortlink.service.ShortUrlService;
@@ -26,8 +25,7 @@ class RedirectControllerTest {
 
     @Test
     void redirectsToOriginalUrlWhenActive() throws Exception {
-        ShortUrl entity = new ShortUrl("https://example.com/products/java", null);
-        when(service.resolve("java")).thenReturn(entity);
+        when(service.resolve("java")).thenReturn("https://example.com/products/java");
 
         mockMvc.perform(get("/java"))
                 .andExpect(status().isFound())
