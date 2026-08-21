@@ -18,3 +18,7 @@ app:
   jwt:
     secret: test-only-jwt-secret-value-not-used-in-production-32bytes+
     expiration-minutes: 60
+  rate-limit:
+    window-seconds: 2
+    anonymous-limit: 3
+    authenticated-limit: 5

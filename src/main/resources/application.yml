@@ -24,3 +24,7 @@ app:
   jwt:
     secret: ${APP_JWT_SECRET}
     expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:60}
+  rate-limit:
+    window-seconds: ${APP_RATE_LIMIT_WINDOW_SECONDS:60}
+    anonymous-limit: ${APP_RATE_LIMIT_ANONYMOUS_LIMIT:10}
+    authenticated-limit: ${APP_RATE_LIMIT_AUTHENTICATED_LIMIT:100}

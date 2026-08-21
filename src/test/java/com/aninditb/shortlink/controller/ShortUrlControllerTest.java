@@ -8,6 +8,8 @@ import com.aninditb.shortlink.exception.ForbiddenException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
 import com.aninditb.shortlink.service.JwtService;
 import com.aninditb.shortlink.service.ShortUrlService;
+import com.aninditb.shortlink.web.RateLimitInterceptor;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +47,18 @@ class ShortUrlControllerTest {
     // their only unsatisfied dependency, so it must be mocked even though this test never uses it.
     @MockBean
     private JwtService jwtService;
+
+    // WebMvcConfig (a WebMvcConfigurer, part of the slice) requires a RateLimitInterceptor bean;
+    // HandlerInterceptor isn't itself a retained @WebMvcTest type, so it must be mocked here too.
+    // Its preHandle() defaults to false on a bare mock, which would 429 every create call below,
+    // so stub it to always allow -- this class exercises the controller, not rate limiting.
+    @MockBean
+    private RateLimitInterceptor rateLimitInterceptor;
+
+    @BeforeEach
+    void allowAllRequestsThroughRateLimiter() {
+        lenient().when(rateLimitInterceptor.preHandle(any(), any(), any())).thenReturn(true);
+    }
 
     @Test
     void createReturns201WithBody() throws Exception {
