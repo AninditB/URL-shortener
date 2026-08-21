@@ -1,10 +1,14 @@
 package com.aninditb.shortlink.controller;
 
+import com.aninditb.shortlink.dto.TokenResponse;
 import com.aninditb.shortlink.dto.UserResponse;
 import com.aninditb.shortlink.exception.EmailAlreadyExistsException;
+import com.aninditb.shortlink.exception.InvalidCredentialsException;
+import com.aninditb.shortlink.service.JwtService;
 import com.aninditb.shortlink.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -16,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
     @Autowired
@@ -23,6 +28,11 @@ class AuthControllerTest {
 
     @MockBean
     private UserService userService;
+
+    // JwtAuthenticationFilter/SecurityConfig are part of the web-layer slice; JwtService is
+    // their only unsatisfied dependency, so it must be mocked even though this test never uses it.
+    @MockBean
+    private JwtService jwtService;
 
     @Test
     void registerReturns201WithBody() throws Exception {
@@ -61,5 +71,27 @@ class AuthControllerTest {
                         .content("{\"email\":\"taken@example.com\",\"password\":\"plaintext-pw\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void loginWithCorrectCredentialsReturns200WithToken() throws Exception {
+        when(userService.login(any())).thenReturn(new TokenResponse("a.b.c"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType("application/json")
+                        .content("{\"email\":\"new@example.com\",\"password\":\"plaintext-pw\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("a.b.c"));
+    }
+
+    @Test
+    void loginWithWrongPasswordReturns401() throws Exception {
+        when(userService.login(any())).thenThrow(new InvalidCredentialsException("Invalid email or password"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType("application/json")
+                        .content("{\"email\":\"new@example.com\",\"password\":\"wrong-password\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
     }
 }
