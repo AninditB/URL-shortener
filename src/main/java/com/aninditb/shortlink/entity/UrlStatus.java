@@ -2,5 +2,6 @@ package com.aninditb.shortlink.entity;
 
 public enum UrlStatus {
     ACTIVE,
-    EXPIRED
+    EXPIRED,
+    DISABLED
 }

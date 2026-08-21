@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/*").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/urls/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/urls/*/disable").authenticated()
                         // Everything else stays permitAll for now; ownership itself is enforced
                         // in ShortUrlServiceImpl once a caller is authenticated.
                         .anyRequest().permitAll()

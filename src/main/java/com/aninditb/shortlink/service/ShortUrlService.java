@@ -13,4 +13,6 @@ public interface ShortUrlService {
     UrlDetailsResponse getDetails(Long id);
 
     void delete(Long id);
+
+    void disable(Long id);
 }

@@ -97,6 +97,10 @@ public class ShortUrlServiceImpl implements ShortUrlService {
             throw new UrlExpiredException("URL for code '" + shortCode + "' has expired");
         }
 
+        if (entity.getStatus() == UrlStatus.DISABLED) {
+            throw new UrlExpiredException("URL for code '" + shortCode + "' has been disabled");
+        }
+
         cacheActiveUrl(entity);
         return entity.getOriginalUrl();
     }
@@ -122,13 +126,30 @@ public class ShortUrlServiceImpl implements ShortUrlService {
         ShortUrl entity = repository.findById(id)
                 .orElseThrow(() -> new UrlNotFoundException("No URL found for id " + id));
 
-        Long ownerId = entity.getOwnerId();
-        if (ownerId != null && !ownerId.equals(currentUserId()) && !currentUserIsAdmin()) {
-            throw new ForbiddenException("You do not have permission to delete this URL");
-        }
+        requireOwnerOrAdmin(entity);
 
         repository.delete(entity);
         redisTemplate.delete(cacheKey(entity.getShortCode()));
+    }
+
+    @Override
+    @Transactional
+    public void disable(Long id) {
+        ShortUrl entity = repository.findById(id)
+                .orElseThrow(() -> new UrlNotFoundException("No URL found for id " + id));
+
+        requireOwnerOrAdmin(entity);
+
+        entity.setStatus(UrlStatus.DISABLED);
+        repository.save(entity);
+        redisTemplate.delete(cacheKey(entity.getShortCode()));
+    }
+
+    private void requireOwnerOrAdmin(ShortUrl entity) {
+        Long ownerId = entity.getOwnerId();
+        if (ownerId != null && !ownerId.equals(currentUserId()) && !currentUserIsAdmin()) {
+            throw new ForbiddenException("You do not have permission to modify this URL");
+        }
     }
 
     private boolean expired(ShortUrl entity) {

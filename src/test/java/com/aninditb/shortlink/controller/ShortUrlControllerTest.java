@@ -109,4 +109,20 @@ class ShortUrlControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403));
     }
+
+    @Test
+    void disableReturns204() throws Exception {
+        mockMvc.perform(post("/api/v1/urls/42/disable"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void disableWhenNotOwnerReturns403() throws Exception {
+        doThrow(new ForbiddenException("You do not have permission to modify this URL"))
+                .when(service).disable(42L);
+
+        mockMvc.perform(post("/api/v1/urls/42/disable"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
 }
