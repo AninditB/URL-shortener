@@ -56,7 +56,7 @@ public class ShortUrlServiceImpl implements ShortUrlService {
             entity = repository.save(entity);
         } else {
             entity = new ShortUrl(request.originalUrl(), request.expiresAt());
-            entity.setShortCode("pending-" + UUID.randomUUID());
+            entity.setShortCode("tmp-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
             entity = repository.save(entity);
             entity.setShortCode(Base62Encoder.encode(entity.getId()));
             entity = repository.save(entity);
