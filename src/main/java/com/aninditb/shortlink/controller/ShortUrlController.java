@@ -1,6 +1,7 @@
 package com.aninditb.shortlink.controller;
 
 import com.aninditb.shortlink.dto.CreateShortUrlRequest;
+import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.service.ShortUrlService;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -32,6 +34,14 @@ public class ShortUrlController {
     @GetMapping("/{id}")
     public ResponseEntity<UrlDetailsResponse> getDetails(@PathVariable Long id) {
         return ResponseEntity.ok(service.getDetails(id));
+    }
+
+    @GetMapping
+    public ResponseEntity<PagedUrlResponse> listOwnUrls(
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) Long cursor
+    ) {
+        return ResponseEntity.ok(service.listOwnUrls(limit, cursor));
     }
 
     @DeleteMapping("/{id}")
