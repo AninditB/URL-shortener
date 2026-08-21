@@ -4,9 +4,11 @@ import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
+import com.aninditb.shortlink.service.JwtService;
 import com.aninditb.shortlink.service.ShortUrlService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ShortUrlController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ShortUrlControllerTest {
 
     @Autowired
@@ -30,6 +33,11 @@ class ShortUrlControllerTest {
 
     @MockBean
     private ShortUrlService service;
+
+    // JwtAuthenticationFilter/SecurityConfig are part of the web-layer slice; JwtService is
+    // their only unsatisfied dependency, so it must be mocked even though this test never uses it.
+    @MockBean
+    private JwtService jwtService;
 
     @Test
     void createReturns201WithBody() throws Exception {

@@ -1,6 +1,8 @@
 package com.aninditb.shortlink.controller;
 
+import com.aninditb.shortlink.dto.LoginRequest;
 import com.aninditb.shortlink.dto.RegisterRequest;
+import com.aninditb.shortlink.dto.TokenResponse;
 import com.aninditb.shortlink.dto.UserResponse;
 import com.aninditb.shortlink.service.UserService;
 import jakarta.validation.Valid;
@@ -23,5 +25,10 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.status(201).body(userService.register(request));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(userService.login(request));
     }
 }

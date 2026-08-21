@@ -21,3 +21,6 @@ spring:
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:60}
