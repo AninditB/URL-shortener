@@ -1,6 +1,5 @@
 package com.aninditb.shortlink.controller;
 
-import com.aninditb.shortlink.entity.ShortUrl;
 import com.aninditb.shortlink.service.ShortUrlService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,9 +19,9 @@ public class RedirectController {
 
     @GetMapping("/{shortCode}")
     public ResponseEntity<Void> redirect(@PathVariable String shortCode) {
-        ShortUrl entity = service.resolve(shortCode);
+        String originalUrl = service.resolve(shortCode);
         return ResponseEntity.status(302)
-                .location(URI.create(entity.getOriginalUrl()))
+                .location(URI.create(originalUrl))
                 .build();
     }
 }

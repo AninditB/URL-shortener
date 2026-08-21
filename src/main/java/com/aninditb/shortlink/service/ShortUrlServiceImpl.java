@@ -13,26 +13,34 @@ import com.aninditb.shortlink.repository.ShortUrlRepository;
 import com.aninditb.shortlink.util.Base62Encoder;
 import com.aninditb.shortlink.validation.UrlSafetyValidator;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 @Service
 public class ShortUrlServiceImpl implements ShortUrlService {
 
+    private static final String CACHE_KEY_PREFIX = "shortcode:";
+    private static final Duration DEFAULT_CACHE_TTL = Duration.ofHours(1);
+
     private final ShortUrlRepository repository;
     private final UrlSafetyValidator validator;
+    private final StringRedisTemplate redisTemplate;
     private final String baseUrl;
 
     public ShortUrlServiceImpl(
             ShortUrlRepository repository,
             UrlSafetyValidator validator,
+            StringRedisTemplate redisTemplate,
             @Value("${app.base-url}") String baseUrl
     ) {
         this.repository = repository;
         this.validator = validator;
+        this.redisTemplate = redisTemplate;
         this.baseUrl = baseUrl;
     }
 
@@ -67,17 +75,25 @@ public class ShortUrlServiceImpl implements ShortUrlService {
 
     @Override
     @Transactional
-    public ShortUrl resolve(String shortCode) {
+    public String resolve(String shortCode) {
+        String cacheKey = cacheKey(shortCode);
+        String cachedUrl = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedUrl != null) {
+            return cachedUrl;
+        }
+
         ShortUrl entity = repository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException("No URL found for code '" + shortCode + "'"));
 
         if (expired(entity)) {
             entity.setStatus(UrlStatus.EXPIRED);
             repository.save(entity);
+            redisTemplate.delete(cacheKey);
             throw new UrlExpiredException("URL for code '" + shortCode + "' has expired");
         }
 
-        return entity;
+        cacheActiveUrl(entity);
+        return entity.getOriginalUrl();
     }
 
     @Override
@@ -89,6 +105,7 @@ public class ShortUrlServiceImpl implements ShortUrlService {
         if (expired(entity)) {
             entity.setStatus(UrlStatus.EXPIRED);
             entity = repository.save(entity);
+            redisTemplate.delete(cacheKey(entity.getShortCode()));
         }
 
         return toDetailsResponse(entity);
@@ -97,14 +114,28 @@ public class ShortUrlServiceImpl implements ShortUrlService {
     @Override
     @Transactional
     public void delete(Long id) {
-        if (!repository.existsById(id)) {
-            throw new UrlNotFoundException("No URL found for id " + id);
-        }
-        repository.deleteById(id);
+        ShortUrl entity = repository.findById(id)
+                .orElseThrow(() -> new UrlNotFoundException("No URL found for id " + id));
+        repository.delete(entity);
+        redisTemplate.delete(cacheKey(entity.getShortCode()));
     }
 
     private boolean expired(ShortUrl entity) {
         return entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(Instant.now());
+    }
+
+    private void cacheActiveUrl(ShortUrl entity) {
+        Duration ttl = entity.getExpiresAt() != null
+                ? Duration.between(Instant.now(), entity.getExpiresAt())
+                : DEFAULT_CACHE_TTL;
+        if (ttl.isNegative() || ttl.isZero()) {
+            return;
+        }
+        redisTemplate.opsForValue().set(cacheKey(entity.getShortCode()), entity.getOriginalUrl(), ttl);
+    }
+
+    private String cacheKey(String shortCode) {
+        return CACHE_KEY_PREFIX + shortCode;
     }
 
     private UrlDetailsResponse toDetailsResponse(ShortUrl entity) {

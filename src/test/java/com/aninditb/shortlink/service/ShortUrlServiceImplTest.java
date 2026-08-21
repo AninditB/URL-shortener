@@ -16,6 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
@@ -25,7 +27,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,14 +44,22 @@ class ShortUrlServiceImplTest {
     @Mock
     private UrlSafetyValidator validator;
 
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
     @InjectMocks
     private ShortUrlServiceImpl service;
 
     @BeforeEach
-    void setBaseUrl() throws Exception {
+    void setUp() throws Exception {
         Field field = ShortUrlServiceImpl.class.getDeclaredField("baseUrl");
         field.setAccessible(true);
         field.set(service, "http://localhost:8080");
+
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
@@ -92,7 +105,31 @@ class ShortUrlServiceImplTest {
     }
 
     @Test
+    void resolveOnCacheHitSkipsDatabase() {
+        when(valueOperations.get("shortcode:java")).thenReturn("https://example.com/x");
+
+        String resolved = service.resolve("java");
+
+        assertThat(resolved).isEqualTo("https://example.com/x");
+        verify(repository, never()).findByShortCode(anyString());
+    }
+
+    @Test
+    void resolveOnCacheMissFallsBackToDatabaseAndPopulatesCache() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        when(valueOperations.get("shortcode:java")).thenReturn(null);
+        when(repository.findByShortCode("java")).thenReturn(Optional.of(entity));
+
+        String resolved = service.resolve("java");
+
+        assertThat(resolved).isEqualTo("https://example.com/x");
+        verify(valueOperations).set(eq("shortcode:java"), eq("https://example.com/x"), any());
+    }
+
+    @Test
     void resolveThrowsNotFoundWhenMissing() {
+        when(valueOperations.get("shortcode:missing")).thenReturn(null);
         when(repository.findByShortCode("missing")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.resolve("missing"))
@@ -100,9 +137,10 @@ class ShortUrlServiceImplTest {
     }
 
     @Test
-    void resolveThrowsExpiredAndPersistsStatus() {
+    void resolveThrowsExpiredAndPersistsStatusAndEvictsCache() {
         ShortUrl entity = new ShortUrl("https://example.com/x", Instant.now().minus(1, ChronoUnit.DAYS));
         entity.setShortCode("java");
+        when(valueOperations.get("shortcode:java")).thenReturn(null);
         when(repository.findByShortCode("java")).thenReturn(Optional.of(entity));
         when(repository.save(entity)).thenReturn(entity);
 
@@ -111,17 +149,7 @@ class ShortUrlServiceImplTest {
 
         assertThat(entity.getStatus()).isEqualTo(UrlStatus.EXPIRED);
         verify(repository).save(entity);
-    }
-
-    @Test
-    void resolveReturnsActiveEntity() {
-        ShortUrl entity = new ShortUrl("https://example.com/x", null);
-        entity.setShortCode("java");
-        when(repository.findByShortCode("java")).thenReturn(Optional.of(entity));
-
-        ShortUrl resolved = service.resolve("java");
-
-        assertThat(resolved.getOriginalUrl()).isEqualTo("https://example.com/x");
+        verify(redisTemplate).delete("shortcode:java");
     }
 
     @Test
@@ -135,25 +163,30 @@ class ShortUrlServiceImplTest {
         UrlDetailsResponse response = service.getDetails(1L);
 
         assertThat(response.status()).isEqualTo("EXPIRED");
+        verify(redisTemplate).delete("shortcode:java");
     }
 
     @Test
     void deleteThrowsNotFoundWhenMissing() {
-        when(repository.existsById(1L)).thenReturn(false);
+        when(repository.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete(1L))
                 .isInstanceOf(UrlNotFoundException.class);
 
-        verify(repository, never()).deleteById(any());
+        verify(repository, never()).delete(any());
     }
 
     @Test
-    void deleteRemovesExistingRow() {
-        when(repository.existsById(1L)).thenReturn(true);
+    void deleteRemovesExistingRowAndEvictsCache() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
 
         service.delete(1L);
 
-        verify(repository).deleteById(1L);
+        verify(repository).delete(entity);
+        verify(redisTemplate).delete("shortcode:java");
     }
 
     private static void setId(ShortUrl entity, long id) {
