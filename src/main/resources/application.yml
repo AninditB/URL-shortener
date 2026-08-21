@@ -8,6 +8,10 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/shortlink}
     username: ${SPRING_DATASOURCE_USERNAME:shortlink}
     password: ${SPRING_DATASOURCE_PASSWORD:shortlink}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
   jpa:
     hibernate:
       ddl-auto: validate
