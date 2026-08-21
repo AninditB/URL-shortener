@@ -67,7 +67,7 @@ expires_at
 
 ### Short-code generation
 
-(Document the chosen strategy here once decided — base62-encoded auto-increment ID, hash + collision check, or pre-generated code pool. This choice gets revisited in Phase 5 once multiple stateless app instances are writing concurrently.)
+Base62-encoded auto-increment ID: a row is inserted to obtain its database-assigned `id`, which is then Base62-encoded (`[0-9A-Za-z]`) into `short_code`. Simple and collision-free by construction, but it couples code generation to a single writer — this gets revisited in Phase 5 once multiple stateless app instances are writing concurrently (e.g. Snowflake IDs or a Redis-backed atomic counter).
 
 ## API
 
@@ -119,7 +119,15 @@ DELETE /api/v1/urls/{id}
 
 * Java 21
 * Maven
-* PostgreSQL (running locally, or via Docker — instructions TBD)
+* Docker (for local PostgreSQL via Docker Compose), or a locally running PostgreSQL instance
+
+### Start PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+This starts a `postgres:16` container with a `shortlink` database, matching the app's default connection settings.
 
 ### Run locally
 
@@ -127,17 +135,32 @@ DELETE /api/v1/urls/{id}
 mvn spring-boot:run
 ```
 
+Flyway applies the schema migrations automatically on startup. The app listens on `http://localhost:8080`.
+
 ### Run tests
 
 ```bash
 mvn test
 ```
 
-(Connection details, environment variables, and setup steps will be filled in as the application takes shape.)
+### Configuration
+
+The app reads its datasource from environment variables, defaulting to the Docker Compose setup above:
+
+| Variable | Default |
+| --- | --- |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/shortlink` |
+| `SPRING_DATASOURCE_USERNAME` | `shortlink` |
+| `SPRING_DATASOURCE_PASSWORD` | `shortlink` |
+| `APP_BASE_URL` | `http://localhost:8080` |
+
+### API Docs
+
+Once running, Swagger UI is available at `http://localhost:8080/swagger-ui.html`.
 
 ## Status
 
-🚧 In progress — this phase is the current focus of development.
+✅ Complete — all Phase 1 functional requirements implemented and verified against a real PostgreSQL instance.
 
 ## What's Next
 
