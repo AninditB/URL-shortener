@@ -202,6 +202,18 @@ class ShortUrlServiceImplTest {
     }
 
     @Test
+    void resolveThrowsExpiredForDisabledLink() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.DISABLED);
+        when(valueOperations.get("shortcode:java")).thenReturn(null);
+        when(repository.findByShortCode("java")).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.resolve("java"))
+                .isInstanceOf(UrlExpiredException.class);
+    }
+
+    @Test
     void getDetailsOnExpiredLinkReturnsExpiredStatusWithoutThrowing() {
         ShortUrl entity = new ShortUrl("https://example.com/x", Instant.now().minus(1, ChronoUnit.DAYS));
         entity.setShortCode("java");
@@ -213,6 +225,19 @@ class ShortUrlServiceImplTest {
 
         assertThat(response.status()).isEqualTo("EXPIRED");
         verify(redisTemplate).delete("shortcode:java");
+    }
+
+    @Test
+    void getDetailsOnDisabledLinkReturnsDisabledStatusWithoutThrowing() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.DISABLED);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        UrlDetailsResponse response = service.getDetails(1L);
+
+        assertThat(response.status()).isEqualTo("DISABLED");
     }
 
     @Test
@@ -292,6 +317,60 @@ class ShortUrlServiceImplTest {
         service.delete(1L);
 
         verify(repository).delete(entity);
+    }
+
+    @Test
+    void disableThrowsNotFoundWhenMissing() {
+        when(repository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.disable(1L))
+                .isInstanceOf(UrlNotFoundException.class);
+    }
+
+    @Test
+    void disableByOwnerSetsDisabledStatusAndEvictsCache() {
+        authenticateAs(5L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(repository.save(entity)).thenReturn(entity);
+
+        service.disable(1L);
+
+        assertThat(entity.getStatus()).isEqualTo(UrlStatus.DISABLED);
+        verify(redisTemplate).delete("shortcode:java");
+    }
+
+    @Test
+    void disableByNonOwnerThrowsForbidden() {
+        authenticateAs(6L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.disable(1L))
+                .isInstanceOf(ForbiddenException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void disableByAdminSucceedsRegardlessOfOwnership() {
+        authenticateAs(6L, "ADMIN");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(repository.save(entity)).thenReturn(entity);
+
+        service.disable(1L);
+
+        assertThat(entity.getStatus()).isEqualTo(UrlStatus.DISABLED);
     }
 
     private static void setId(ShortUrl entity, long id) {

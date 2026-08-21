@@ -39,4 +39,10 @@ public class ShortUrlController {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/disable")
+    public ResponseEntity<Void> disable(@PathVariable Long id) {
+        service.disable(id);
+        return ResponseEntity.noContent().build();
+    }
 }
