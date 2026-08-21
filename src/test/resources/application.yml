@@ -7,6 +7,11 @@ spring:
     redis:
       host: localhost
       port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+    admin:
+      fail-fast: false
+      auto-create: false
   jpa:
     hibernate:
       ddl-auto: create-drop
