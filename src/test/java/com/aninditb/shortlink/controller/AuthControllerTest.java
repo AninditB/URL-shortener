@@ -6,6 +6,7 @@ import com.aninditb.shortlink.exception.EmailAlreadyExistsException;
 import com.aninditb.shortlink.exception.InvalidCredentialsException;
 import com.aninditb.shortlink.service.JwtService;
 import com.aninditb.shortlink.service.UserService;
+import com.aninditb.shortlink.web.RateLimitInterceptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -33,6 +34,11 @@ class AuthControllerTest {
     // their only unsatisfied dependency, so it must be mocked even though this test never uses it.
     @MockBean
     private JwtService jwtService;
+
+    // WebMvcConfig (a WebMvcConfigurer, part of the slice) requires a RateLimitInterceptor bean;
+    // not stubbed since these /api/v1/auth requests never match its /api/v1/urls path pattern.
+    @MockBean
+    private RateLimitInterceptor rateLimitInterceptor;
 
     @Test
     void registerReturns201WithBody() throws Exception {
