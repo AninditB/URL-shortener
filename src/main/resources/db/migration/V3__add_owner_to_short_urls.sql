@@ -1,0 +1,1 @@
+ALTER TABLE short_urls ADD COLUMN owner_id BIGINT NULL REFERENCES users(id);

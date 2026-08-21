@@ -3,6 +3,7 @@ package com.aninditb.shortlink.controller;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
+import com.aninditb.shortlink.exception.ForbiddenException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
 import com.aninditb.shortlink.service.JwtService;
 import com.aninditb.shortlink.service.ShortUrlService;
@@ -17,6 +18,7 @@ import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -96,5 +98,15 @@ class ShortUrlControllerTest {
     void deleteReturns204() throws Exception {
         mockMvc.perform(delete("/api/v1/urls/42"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deleteWhenNotOwnerReturns403() throws Exception {
+        doThrow(new ForbiddenException("You do not have permission to delete this URL"))
+                .when(service).delete(42L);
+
+        mockMvc.perform(delete("/api/v1/urls/42"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
     }
 }

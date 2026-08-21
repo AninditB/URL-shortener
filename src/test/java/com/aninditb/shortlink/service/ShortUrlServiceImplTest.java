@@ -6,22 +6,29 @@ import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.entity.ShortUrl;
 import com.aninditb.shortlink.entity.UrlStatus;
 import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
+import com.aninditb.shortlink.exception.ForbiddenException;
 import com.aninditb.shortlink.exception.UrlExpiredException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
 import com.aninditb.shortlink.repository.ShortUrlRepository;
 import com.aninditb.shortlink.validation.UrlSafetyValidator;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +67,19 @@ class ShortUrlServiceImplTest {
         field.set(service, "http://localhost:8080");
 
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private static void authenticateAs(long userId, String... roles) {
+        List<SimpleGrantedAuthority> authorities = List.of(roles).stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .toList();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, authorities));
     }
 
     @Test
@@ -102,6 +122,35 @@ class ShortUrlServiceImplTest {
 
         assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(AliasAlreadyExistsException.class);
+    }
+
+    @Test
+    void createSetsOwnerIdWhenAuthenticated() {
+        authenticateAs(9L, "USER");
+        CreateShortUrlRequest request = new CreateShortUrlRequest("https://example.com/x", "java", null);
+        doNothing().when(validator).validate(request.originalUrl());
+        doNothing().when(validator).validateAlias("java");
+        when(repository.existsByShortCode("java")).thenReturn(false);
+        ArgumentCaptor<ShortUrl> captor = ArgumentCaptor.forClass(ShortUrl.class);
+        when(repository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.create(request);
+
+        assertThat(captor.getValue().getOwnerId()).isEqualTo(9L);
+    }
+
+    @Test
+    void createLeavesOwnerNullWhenAnonymous() {
+        CreateShortUrlRequest request = new CreateShortUrlRequest("https://example.com/x", "java", null);
+        doNothing().when(validator).validate(request.originalUrl());
+        doNothing().when(validator).validateAlias("java");
+        when(repository.existsByShortCode("java")).thenReturn(false);
+        ArgumentCaptor<ShortUrl> captor = ArgumentCaptor.forClass(ShortUrl.class);
+        when(repository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.create(request);
+
+        assertThat(captor.getValue().getOwnerId()).isNull();
     }
 
     @Test
@@ -187,6 +236,62 @@ class ShortUrlServiceImplTest {
 
         verify(repository).delete(entity);
         verify(redisTemplate).delete("shortcode:java");
+    }
+
+    @Test
+    void deleteByOwnerSucceeds() {
+        authenticateAs(5L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        service.delete(1L);
+
+        verify(repository).delete(entity);
+    }
+
+    @Test
+    void deleteByNonOwnerThrowsForbidden() {
+        authenticateAs(6L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.delete(1L))
+                .isInstanceOf(ForbiddenException.class);
+
+        verify(repository, never()).delete(any());
+    }
+
+    @Test
+    void deleteByAdminSucceedsRegardlessOfOwnership() {
+        authenticateAs(6L, "ADMIN");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        service.delete(1L);
+
+        verify(repository).delete(entity);
+    }
+
+    @Test
+    void deleteOfAnonymouslyOwnedUrlSucceedsForAnyAuthenticatedCaller() {
+        authenticateAs(6L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        service.delete(1L);
+
+        verify(repository).delete(entity);
     }
 
     private static void setId(ShortUrl entity, long id) {
