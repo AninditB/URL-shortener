@@ -5,7 +5,9 @@ import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
 import com.aninditb.shortlink.exception.ForbiddenException;
+import com.aninditb.shortlink.exception.IdempotencyConflictException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
+import com.aninditb.shortlink.service.IdempotencyService;
 import com.aninditb.shortlink.service.JwtService;
 import com.aninditb.shortlink.service.ShortUrlService;
 import com.aninditb.shortlink.web.RateLimitInterceptor;
@@ -19,13 +21,18 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,6 +62,11 @@ class ShortUrlControllerTest {
     @MockBean
     private RateLimitInterceptor rateLimitInterceptor;
 
+    // Constructor dependency of ShortUrlController; not stubbed by default so tests
+    // that never send an Idempotency-Key header (the common case) don't need it.
+    @MockBean
+    private IdempotencyService idempotencyService;
+
     @BeforeEach
     void allowAllRequestsThroughRateLimiter() {
         lenient().when(rateLimitInterceptor.preHandle(any(), any(), any())).thenReturn(true);
@@ -70,6 +82,51 @@ class ShortUrlControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.shortCode").value("java"))
                 .andExpect(jsonPath("$.shortUrl").value("http://localhost:8080/java"));
+
+        verifyNoInteractions(idempotencyService);
+    }
+
+    @Test
+    void createWithFreshIdempotencyKeyStoresResponse() throws Exception {
+        when(idempotencyService.findExisting(eq("key-1"), anyString())).thenReturn(Optional.empty());
+        when(service.create(any())).thenReturn(new ShortUrlResponse("java", "http://localhost:8080/java"));
+
+        mockMvc.perform(post("/api/v1/urls")
+                        .header("Idempotency-Key", "key-1")
+                        .contentType("application/json")
+                        .content("{\"originalUrl\":\"https://example.com/products/java\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shortCode").value("java"));
+
+        verify(idempotencyService).store(eq("key-1"), anyString(), any(ShortUrlResponse.class));
+    }
+
+    @Test
+    void createReplayedWithSameKeyAndBodyReturnsStoredResponseWithoutCallingService() throws Exception {
+        ShortUrlResponse stored = new ShortUrlResponse("java", "http://localhost:8080/java");
+        when(idempotencyService.findExisting(eq("key-1"), anyString())).thenReturn(Optional.of(stored));
+
+        mockMvc.perform(post("/api/v1/urls")
+                        .header("Idempotency-Key", "key-1")
+                        .contentType("application/json")
+                        .content("{\"originalUrl\":\"https://example.com/products/java\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shortCode").value("java"));
+
+        verify(service, never()).create(any());
+    }
+
+    @Test
+    void createReplayedWithSameKeyAndDifferentBodyReturns409() throws Exception {
+        when(idempotencyService.findExisting(eq("key-1"), anyString()))
+                .thenThrow(new IdempotencyConflictException("Idempotency-Key 'key-1' was already used with a different request body"));
+
+        mockMvc.perform(post("/api/v1/urls")
+                        .header("Idempotency-Key", "key-1")
+                        .contentType("application/json")
+                        .content("{\"originalUrl\":\"https://example.com/different\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
     }
 
     @Test
