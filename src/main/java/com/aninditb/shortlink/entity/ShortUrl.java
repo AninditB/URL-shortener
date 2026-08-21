@@ -40,6 +40,9 @@ public class ShortUrl {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    @Column(name = "owner_id")
+    private Long ownerId;
+
     protected ShortUrl() {
     }
 
@@ -97,5 +100,13 @@ public class ShortUrl {
 
     public Instant getExpiresAt() {
         return expiresAt;
+    }
+
+    public Long getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(Long ownerId) {
+        this.ownerId = ownerId;
     }
 }

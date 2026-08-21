@@ -3,6 +3,7 @@ package com.aninditb.shortlink.config;
 import com.aninditb.shortlink.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -25,8 +26,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/*").permitAll()
-                        // Enforcement lands in ticket 5; the JWT filter below already populates
-                        // the security context for later tickets to build on.
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/urls/**").authenticated()
+                        // Everything else stays permitAll for now; ownership itself is enforced
+                        // in ShortUrlServiceImpl once a caller is authenticated.
                         .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

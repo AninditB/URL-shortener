@@ -6,6 +6,7 @@ import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.entity.ShortUrl;
 import com.aninditb.shortlink.entity.UrlStatus;
 import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
+import com.aninditb.shortlink.exception.ForbiddenException;
 import com.aninditb.shortlink.exception.InvalidUrlException;
 import com.aninditb.shortlink.exception.UrlExpiredException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
@@ -14,6 +15,8 @@ import com.aninditb.shortlink.util.Base62Encoder;
 import com.aninditb.shortlink.validation.UrlSafetyValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,10 +64,12 @@ public class ShortUrlServiceImpl implements ShortUrlService {
             }
             entity = new ShortUrl(request.originalUrl(), request.expiresAt());
             entity.setShortCode(request.customAlias());
+            entity.setOwnerId(currentUserId());
             entity = repository.save(entity);
         } else {
             entity = new ShortUrl(request.originalUrl(), request.expiresAt());
             entity.setShortCode("tmp-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
+            entity.setOwnerId(currentUserId());
             entity = repository.save(entity);
             entity.setShortCode(Base62Encoder.encode(entity.getId()));
             entity = repository.save(entity);
@@ -116,12 +121,33 @@ public class ShortUrlServiceImpl implements ShortUrlService {
     public void delete(Long id) {
         ShortUrl entity = repository.findById(id)
                 .orElseThrow(() -> new UrlNotFoundException("No URL found for id " + id));
+
+        Long ownerId = entity.getOwnerId();
+        if (ownerId != null && !ownerId.equals(currentUserId()) && !currentUserIsAdmin()) {
+            throw new ForbiddenException("You do not have permission to delete this URL");
+        }
+
         repository.delete(entity);
         redisTemplate.delete(cacheKey(entity.getShortCode()));
     }
 
     private boolean expired(ShortUrl entity) {
         return entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(Instant.now());
+    }
+
+    private Long currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = authentication != null ? authentication.getPrincipal() : null;
+        return principal instanceof Long userId ? userId : null;
+    }
+
+    private boolean currentUserIsAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
     }
 
     private void cacheActiveUrl(ShortUrl entity) {
