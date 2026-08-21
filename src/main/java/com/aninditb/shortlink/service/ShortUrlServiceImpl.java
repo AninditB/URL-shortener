@@ -1,6 +1,7 @@
 package com.aninditb.shortlink.service;
 
 import com.aninditb.shortlink.dto.CreateShortUrlRequest;
+import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.entity.ShortUrl;
@@ -14,6 +15,8 @@ import com.aninditb.shortlink.repository.ShortUrlRepository;
 import com.aninditb.shortlink.util.Base62Encoder;
 import com.aninditb.shortlink.validation.UrlSafetyValidator;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -143,6 +147,22 @@ public class ShortUrlServiceImpl implements ShortUrlService {
         entity.setStatus(UrlStatus.DISABLED);
         repository.save(entity);
         redisTemplate.delete(cacheKey(entity.getShortCode()));
+    }
+
+    @Override
+    public PagedUrlResponse listOwnUrls(int limit, Long cursor) {
+        Long ownerId = currentUserId();
+        int effectiveLimit = Math.min(Math.max(limit, 1), 100);
+        Pageable pageable = PageRequest.of(0, effectiveLimit);
+
+        List<ShortUrl> results = cursor != null
+                ? repository.findByOwnerIdAndIdLessThanOrderByIdDesc(ownerId, cursor, pageable)
+                : repository.findByOwnerIdOrderByIdDesc(ownerId, pageable);
+
+        List<UrlDetailsResponse> items = results.stream().map(this::toDetailsResponse).toList();
+        Long nextCursor = results.size() == effectiveLimit ? results.get(results.size() - 1).getId() : null;
+
+        return new PagedUrlResponse(items, nextCursor);
     }
 
     private void requireOwnerOrAdmin(ShortUrl entity) {

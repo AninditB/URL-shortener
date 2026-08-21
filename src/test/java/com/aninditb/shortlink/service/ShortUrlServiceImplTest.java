@@ -1,6 +1,7 @@
 package com.aninditb.shortlink.service;
 
 import com.aninditb.shortlink.dto.CreateShortUrlRequest;
+import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.entity.ShortUrl;
@@ -19,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -371,6 +373,71 @@ class ShortUrlServiceImplTest {
         service.disable(1L);
 
         assertThat(entity.getStatus()).isEqualTo(UrlStatus.DISABLED);
+    }
+
+    @Test
+    void listOwnUrlsWithoutCursorUsesNoCursorQuery() {
+        authenticateAs(9L, "USER");
+        when(repository.findByOwnerIdOrderByIdDesc(eq(9L), any())).thenReturn(List.of());
+
+        service.listOwnUrls(20, null);
+
+        verify(repository).findByOwnerIdOrderByIdDesc(eq(9L), any());
+        verify(repository, never()).findByOwnerIdAndIdLessThanOrderByIdDesc(any(), any(), any());
+    }
+
+    @Test
+    void listOwnUrlsWithCursorUsesCursorQuery() {
+        authenticateAs(9L, "USER");
+        when(repository.findByOwnerIdAndIdLessThanOrderByIdDesc(eq(9L), eq(50L), any())).thenReturn(List.of());
+
+        service.listOwnUrls(20, 50L);
+
+        verify(repository).findByOwnerIdAndIdLessThanOrderByIdDesc(eq(9L), eq(50L), any());
+    }
+
+    @Test
+    void listOwnUrlsCapsLimitAtOneHundred() {
+        authenticateAs(9L, "USER");
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        when(repository.findByOwnerIdOrderByIdDesc(eq(9L), pageableCaptor.capture())).thenReturn(List.of());
+
+        service.listOwnUrls(500, null);
+
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(100);
+    }
+
+    @Test
+    void listOwnUrlsSetsNextCursorWhenPageIsFull() {
+        authenticateAs(9L, "USER");
+        ShortUrl a = new ShortUrl("https://example.com/a", null);
+        a.setShortCode("a");
+        a.setStatus(UrlStatus.ACTIVE);
+        setId(a, 10L);
+        ShortUrl b = new ShortUrl("https://example.com/b", null);
+        b.setShortCode("b");
+        b.setStatus(UrlStatus.ACTIVE);
+        setId(b, 9L);
+        when(repository.findByOwnerIdOrderByIdDesc(eq(9L), any())).thenReturn(List.of(a, b));
+
+        PagedUrlResponse response = service.listOwnUrls(2, null);
+
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.nextCursor()).isEqualTo(9L);
+    }
+
+    @Test
+    void listOwnUrlsLeavesNextCursorNullWhenPageIsShort() {
+        authenticateAs(9L, "USER");
+        ShortUrl a = new ShortUrl("https://example.com/a", null);
+        a.setShortCode("a");
+        a.setStatus(UrlStatus.ACTIVE);
+        setId(a, 10L);
+        when(repository.findByOwnerIdOrderByIdDesc(eq(9L), any())).thenReturn(List.of(a));
+
+        PagedUrlResponse response = service.listOwnUrls(2, null);
+
+        assertThat(response.nextCursor()).isNull();
     }
 
     private static void setId(ShortUrl entity, long id) {

@@ -1,5 +1,6 @@
 package com.aninditb.shortlink.controller;
 
+import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
@@ -15,9 +16,12 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -124,5 +128,19 @@ class ShortUrlControllerTest {
         mockMvc.perform(post("/api/v1/urls/42/disable"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void listOwnUrlsReturns200WithItemsAndNextCursor() throws Exception {
+        UrlDetailsResponse item = new UrlDetailsResponse(
+                42L, "java", "https://example.com/products/java", "ACTIVE",
+                Instant.parse("2026-08-20T04:00:00Z"), Instant.parse("2026-08-20T04:00:00Z"), null
+        );
+        when(service.listOwnUrls(anyInt(), isNull())).thenReturn(new PagedUrlResponse(List.of(item), 41L));
+
+        mockMvc.perform(get("/api/v1/urls"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].shortCode").value("java"))
+                .andExpect(jsonPath("$.nextCursor").value(41));
     }
 }
