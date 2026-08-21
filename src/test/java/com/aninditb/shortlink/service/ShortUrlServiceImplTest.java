@@ -1,0 +1,168 @@
+package com.aninditb.shortlink.service;
+
+import com.aninditb.shortlink.dto.CreateShortUrlRequest;
+import com.aninditb.shortlink.dto.ShortUrlResponse;
+import com.aninditb.shortlink.dto.UrlDetailsResponse;
+import com.aninditb.shortlink.entity.ShortUrl;
+import com.aninditb.shortlink.entity.UrlStatus;
+import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
+import com.aninditb.shortlink.exception.UrlExpiredException;
+import com.aninditb.shortlink.exception.UrlNotFoundException;
+import com.aninditb.shortlink.repository.ShortUrlRepository;
+import com.aninditb.shortlink.validation.UrlSafetyValidator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.lang.reflect.Field;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ShortUrlServiceImplTest {
+
+    @Mock
+    private ShortUrlRepository repository;
+
+    @Mock
+    private UrlSafetyValidator validator;
+
+    @InjectMocks
+    private ShortUrlServiceImpl service;
+
+    @BeforeEach
+    void setBaseUrl() throws Exception {
+        Field field = ShortUrlServiceImpl.class.getDeclaredField("baseUrl");
+        field.setAccessible(true);
+        field.set(service, "http://localhost:8080");
+    }
+
+    @Test
+    void createWithoutAliasEncodesGeneratedId() {
+        CreateShortUrlRequest request = new CreateShortUrlRequest("https://example.com/x", null, null);
+        doNothing().when(validator).validate(request.originalUrl());
+
+        when(repository.save(any(ShortUrl.class))).thenAnswer(invocation -> {
+            ShortUrl entity = invocation.getArgument(0);
+            setId(entity, 62L);
+            return entity;
+        });
+
+        ShortUrlResponse response = service.create(request);
+
+        assertThat(response.shortCode()).isEqualTo("10");
+        assertThat(response.shortUrl()).isEqualTo("http://localhost:8080/10");
+    }
+
+    @Test
+    void createWithAliasUsesAliasAsShortCode() {
+        CreateShortUrlRequest request = new CreateShortUrlRequest("https://example.com/x", "java", null);
+        doNothing().when(validator).validate(request.originalUrl());
+        doNothing().when(validator).validateAlias("java");
+        when(repository.existsByShortCode("java")).thenReturn(false);
+        when(repository.save(any(ShortUrl.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShortUrlResponse response = service.create(request);
+
+        assertThat(response.shortCode()).isEqualTo("java");
+        assertThat(response.shortUrl()).isEqualTo("http://localhost:8080/java");
+    }
+
+    @Test
+    void createWithTakenAliasThrowsConflict() {
+        CreateShortUrlRequest request = new CreateShortUrlRequest("https://example.com/x", "java", null);
+        doNothing().when(validator).validate(request.originalUrl());
+        doNothing().when(validator).validateAlias("java");
+        when(repository.existsByShortCode("java")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.create(request))
+                .isInstanceOf(AliasAlreadyExistsException.class);
+    }
+
+    @Test
+    void resolveThrowsNotFoundWhenMissing() {
+        when(repository.findByShortCode("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resolve("missing"))
+                .isInstanceOf(UrlNotFoundException.class);
+    }
+
+    @Test
+    void resolveThrowsExpiredAndPersistsStatus() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", Instant.now().minus(1, ChronoUnit.DAYS));
+        entity.setShortCode("java");
+        when(repository.findByShortCode("java")).thenReturn(Optional.of(entity));
+        when(repository.save(entity)).thenReturn(entity);
+
+        assertThatThrownBy(() -> service.resolve("java"))
+                .isInstanceOf(UrlExpiredException.class);
+
+        assertThat(entity.getStatus()).isEqualTo(UrlStatus.EXPIRED);
+        verify(repository).save(entity);
+    }
+
+    @Test
+    void resolveReturnsActiveEntity() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        when(repository.findByShortCode("java")).thenReturn(Optional.of(entity));
+
+        ShortUrl resolved = service.resolve("java");
+
+        assertThat(resolved.getOriginalUrl()).isEqualTo("https://example.com/x");
+    }
+
+    @Test
+    void getDetailsOnExpiredLinkReturnsExpiredStatusWithoutThrowing() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", Instant.now().minus(1, ChronoUnit.DAYS));
+        entity.setShortCode("java");
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(repository.save(entity)).thenReturn(entity);
+
+        UrlDetailsResponse response = service.getDetails(1L);
+
+        assertThat(response.status()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void deleteThrowsNotFoundWhenMissing() {
+        when(repository.existsById(1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.delete(1L))
+                .isInstanceOf(UrlNotFoundException.class);
+
+        verify(repository, never()).deleteById(any());
+    }
+
+    @Test
+    void deleteRemovesExistingRow() {
+        when(repository.existsById(1L)).thenReturn(true);
+
+        service.delete(1L);
+
+        verify(repository).deleteById(1L);
+    }
+
+    private static void setId(ShortUrl entity, long id) {
+        try {
+            Field field = ShortUrl.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(entity, id);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
