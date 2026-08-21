@@ -22,3 +22,5 @@ app:
     window-seconds: 2
     anonymous-limit: 3
     authenticated-limit: 5
+  idempotency:
+    ttl-hours: 24

@@ -28,3 +28,5 @@ app:
     window-seconds: ${APP_RATE_LIMIT_WINDOW_SECONDS:60}
     anonymous-limit: ${APP_RATE_LIMIT_ANONYMOUS_LIMIT:10}
     authenticated-limit: ${APP_RATE_LIMIT_AUTHENTICATED_LIMIT:100}
+  idempotency:
+    ttl-hours: ${APP_IDEMPOTENCY_TTL_HOURS:24}
