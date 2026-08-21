@@ -1,0 +1,52 @@
+package com.aninditb.shortlink.controller;
+
+import com.aninditb.shortlink.entity.ShortUrl;
+import com.aninditb.shortlink.exception.UrlExpiredException;
+import com.aninditb.shortlink.exception.UrlNotFoundException;
+import com.aninditb.shortlink.service.ShortUrlService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(RedirectController.class)
+class RedirectControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private ShortUrlService service;
+
+    @Test
+    void redirectsToOriginalUrlWhenActive() throws Exception {
+        ShortUrl entity = new ShortUrl("https://example.com/products/java", null);
+        when(service.resolve("java")).thenReturn(entity);
+
+        mockMvc.perform(get("/java"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://example.com/products/java"));
+    }
+
+    @Test
+    void returns404WhenCodeMissing() throws Exception {
+        when(service.resolve("missing")).thenThrow(new UrlNotFoundException("No URL found for code 'missing'"));
+
+        mockMvc.perform(get("/missing"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void returns410WhenExpired() throws Exception {
+        when(service.resolve("java")).thenThrow(new UrlExpiredException("URL for code 'java' has expired"));
+
+        mockMvc.perform(get("/java"))
+                .andExpect(status().isGone());
+    }
+}
