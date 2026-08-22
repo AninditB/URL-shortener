@@ -43,6 +43,16 @@ class GeoCountryResolverTest {
     }
 
     @Test
+    void returnsUnknownOnUnexpectedRuntimeException() throws Exception {
+        // Simulates a misconfigured/missing GeoIP database file: Spring's @Lazy proxy throws an
+        // unchecked BeanCreationException on first real use, not the checked IOException a bad
+        // *open* database would throw.
+        when(databaseReader.country(any(InetAddress.class))).thenThrow(new RuntimeException("bean creation failed"));
+
+        assertThat(resolver.resolve("8.8.8.8")).isEqualTo("UNKNOWN");
+    }
+
+    @Test
     void returnsUnknownWhenCountryHasNoIsoCode() throws Exception {
         CountryResponse response = countryResponse(null);
         when(databaseReader.country(any(InetAddress.class))).thenReturn(response);
