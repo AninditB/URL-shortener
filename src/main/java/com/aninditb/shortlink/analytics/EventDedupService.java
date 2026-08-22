@@ -26,4 +26,8 @@ public class EventDedupService {
         Boolean firstTime = redisTemplate.opsForValue().setIfAbsent(KEY_PREFIX + eventId, "1", ttl);
         return Boolean.TRUE.equals(firstTime);
     }
+
+    public void unmark(String eventId) {
+        redisTemplate.delete(KEY_PREFIX + eventId);
+    }
 }

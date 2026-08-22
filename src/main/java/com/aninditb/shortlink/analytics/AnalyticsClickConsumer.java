@@ -47,17 +47,25 @@ public class AnalyticsClickConsumer {
             return;
         }
 
-        Long shortUrlId = shortUrlRepository.findByShortCode(event.shortCode())
-                .map(ShortUrl::getId)
-                .orElse(null);
-        if (shortUrlId == null) {
-            log.warn("Click event for unknown shortCode '{}', skipping aggregate update", event.shortCode());
-            return;
-        }
+        try {
+            Long shortUrlId = shortUrlRepository.findByShortCode(event.shortCode())
+                    .map(ShortUrl::getId)
+                    .orElse(null);
+            if (shortUrlId == null) {
+                log.warn("Click event for unknown shortCode '{}', skipping aggregate update", event.shortCode());
+                return;
+            }
 
-        shortUrlRepository.incrementTotalClicks(shortUrlId);
-        dailyRepository.incrementDaily(shortUrlId, event.timestamp().atZone(ZoneOffset.UTC).toLocalDate());
-        countryRepository.incrementCountry(shortUrlId, event.country());
-        deviceRepository.incrementDevice(shortUrlId, event.deviceType());
+            shortUrlRepository.incrementTotalClicks(shortUrlId);
+            dailyRepository.incrementDaily(shortUrlId, event.timestamp().atZone(ZoneOffset.UTC).toLocalDate());
+            countryRepository.incrementCountry(shortUrlId, event.country());
+            deviceRepository.incrementDevice(shortUrlId, event.deviceType());
+        } catch (RuntimeException ex) {
+            // The DB transaction rolls back on its own, but the Redis key markProcessed() already
+            // set above does not - without this, a retry of this same event would see it as
+            // already processed and skip it silently, never reaching the DLQ (violates NFR-2).
+            dedupService.unmark(event.eventId());
+            throw ex;
+        }
     }
 }

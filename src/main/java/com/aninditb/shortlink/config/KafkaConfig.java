@@ -4,6 +4,7 @@ import com.aninditb.shortlink.analytics.ClickEvent;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,9 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -77,12 +81,24 @@ public class KafkaConfig {
     }
 
     @Bean
+    public DefaultErrorHandler clickEventErrorHandler(KafkaTemplate<String, ClickEvent> clickEventKafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+                clickEventKafkaTemplate,
+                (record, ex) -> new TopicPartition(CLICK_EVENTS_DLQ_TOPIC, record.partition())
+        );
+        // 3 total delivery attempts (the initial call plus 2 retries), 1s apart, then DLQ.
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 2));
+    }
+
+    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, ClickEvent> kafkaListenerContainerFactory(
-            ConsumerFactory<String, ClickEvent> clickEventConsumerFactory
+            ConsumerFactory<String, ClickEvent> clickEventConsumerFactory,
+            DefaultErrorHandler clickEventErrorHandler
     ) {
         ConcurrentKafkaListenerContainerFactory<String, ClickEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(clickEventConsumerFactory);
+        factory.setCommonErrorHandler(clickEventErrorHandler);
         return factory;
     }
 }
