@@ -1,5 +1,7 @@
 package com.aninditb.shortlink.controller;
 
+import com.aninditb.shortlink.analytics.AnalyticsService;
+import com.aninditb.shortlink.dto.AnalyticsResponse;
 import com.aninditb.shortlink.dto.CreateShortUrlRequest;
 import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
@@ -29,11 +31,18 @@ public class ShortUrlController {
     private final ShortUrlService service;
     private final IdempotencyService idempotencyService;
     private final ObjectMapper objectMapper;
+    private final AnalyticsService analyticsService;
 
-    public ShortUrlController(ShortUrlService service, IdempotencyService idempotencyService, ObjectMapper objectMapper) {
+    public ShortUrlController(
+            ShortUrlService service,
+            IdempotencyService idempotencyService,
+            ObjectMapper objectMapper,
+            AnalyticsService analyticsService
+    ) {
         this.service = service;
         this.idempotencyService = idempotencyService;
         this.objectMapper = objectMapper;
+        this.analyticsService = analyticsService;
     }
 
     @PostMapping
@@ -87,5 +96,10 @@ public class ShortUrlController {
     public ResponseEntity<Void> disable(@PathVariable Long id) {
         service.disable(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/analytics")
+    public ResponseEntity<AnalyticsResponse> getAnalytics(@PathVariable Long id) {
+        return ResponseEntity.ok(analyticsService.getAnalytics(id));
     }
 }
