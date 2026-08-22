@@ -38,3 +38,5 @@ app:
     database-path: ${APP_GEOIP_DATABASE_PATH}
   analytics:
     dedup-ttl-days: ${APP_ANALYTICS_DEDUP_TTL_DAYS:7}
+  cors:
+    allowed-origin: ${APP_CORS_ALLOWED_ORIGIN:http://localhost:5500}

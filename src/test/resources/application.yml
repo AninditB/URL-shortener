@@ -36,3 +36,5 @@ app:
     database-path: not-configured-in-tests.mmdb
   analytics:
     dedup-ttl-days: 7
+  cors:
+    allowed-origin: http://localhost:5500
