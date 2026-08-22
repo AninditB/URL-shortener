@@ -1,5 +1,7 @@
 package com.aninditb.shortlink.controller;
 
+import com.aninditb.shortlink.analytics.AnalyticsService;
+import com.aninditb.shortlink.dto.AnalyticsResponse;
 import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
 import com.aninditb.shortlink.dto.UrlDetailsResponse;
@@ -66,6 +68,9 @@ class ShortUrlControllerTest {
     // that never send an Idempotency-Key header (the common case) don't need it.
     @MockBean
     private IdempotencyService idempotencyService;
+
+    @MockBean
+    private AnalyticsService analyticsService;
 
     @BeforeEach
     void allowAllRequestsThroughRateLimiter() {
@@ -214,5 +219,36 @@ class ShortUrlControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].shortCode").value("java"))
                 .andExpect(jsonPath("$.nextCursor").value(41));
+    }
+
+    @Test
+    void getAnalyticsReturns200() throws Exception {
+        when(analyticsService.getAnalytics(eq(42L))).thenReturn(new AnalyticsResponse(
+                5L, java.util.Map.of("2026-08-20", 5L), java.util.Map.of("US", 5L), java.util.Map.of("DESKTOP", 5L)));
+
+        mockMvc.perform(get("/api/v1/urls/42/analytics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalClicks").value(5))
+                .andExpect(jsonPath("$.topCountries.US").value(5));
+    }
+
+    @Test
+    void getAnalyticsWhenNotOwnerReturns403() throws Exception {
+        when(analyticsService.getAnalytics(eq(42L)))
+                .thenThrow(new ForbiddenException("You do not have permission to view this URL's analytics"));
+
+        mockMvc.perform(get("/api/v1/urls/42/analytics"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void getAnalyticsWhenMissingReturns404() throws Exception {
+        when(analyticsService.getAnalytics(eq(99L)))
+                .thenThrow(new UrlNotFoundException("No URL found for id 99"));
+
+        mockMvc.perform(get("/api/v1/urls/99/analytics"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
     }
 }
