@@ -34,3 +34,5 @@ app:
     authenticated-limit: ${APP_RATE_LIMIT_AUTHENTICATED_LIMIT:100}
   idempotency:
     ttl-hours: ${APP_IDEMPOTENCY_TTL_HOURS:24}
+  geoip:
+    database-path: ${APP_GEOIP_DATABASE_PATH}

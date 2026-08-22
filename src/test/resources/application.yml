@@ -29,3 +29,8 @@ app:
     authenticated-limit: 5
   idempotency:
     ttl-hours: 24
+  # GeoCountryResolver is unit-tested with a mocked DatabaseReader (see GeoCountryResolverTest);
+  # this path is never actually opened because GeoIpConfig's DatabaseReader bean is @Lazy and
+  # nothing calls a real lookup yet (that lands in ticket 4).
+  geoip:
+    database-path: not-configured-in-tests.mmdb
