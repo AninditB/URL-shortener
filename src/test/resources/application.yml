@@ -34,3 +34,5 @@ app:
   # nothing calls a real lookup yet (that lands in ticket 4).
   geoip:
     database-path: not-configured-in-tests.mmdb
+  analytics:
+    dedup-ttl-days: 7

@@ -36,3 +36,5 @@ app:
     ttl-hours: ${APP_IDEMPOTENCY_TTL_HOURS:24}
   geoip:
     database-path: ${APP_GEOIP_DATABASE_PATH}
+  analytics:
+    dedup-ttl-days: ${APP_ANALYTICS_DEDUP_TTL_DAYS:7}
