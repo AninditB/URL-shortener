@@ -38,6 +38,15 @@ public class GeoCountryResolver {
             return isoCode != null ? isoCode : UNKNOWN;
         } catch (GeoIp2Exception | IOException e) {
             return UNKNOWN;
+        } catch (RuntimeException e) {
+            // The @Lazy GeoIp2Provider proxy above resolves GeoIpConfig's DatabaseReader bean on
+            // this first real call - if app.geoip.database-path is missing/misconfigured, Spring
+            // throws an unchecked BeanCreationException here, not the checked IOException a bad
+            // *open* database file would throw. Without this, that exception previously escaped
+            // uncaught into ClickEventPublisher's catch-all, silently dropping the whole click
+            // event instead of just the country lookup - a stricter violation of NFR-1 than a
+            // clean "not found" would be.
+            return UNKNOWN;
         }
     }
 }
