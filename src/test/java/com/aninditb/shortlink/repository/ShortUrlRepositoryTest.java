@@ -46,6 +46,18 @@ class ShortUrlRepositoryTest {
     }
 
     @Test
+    void incrementTotalClicksAccumulates() {
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        Long id = repository.saveAndFlush(entity).getId();
+
+        repository.incrementTotalClicks(id);
+        repository.incrementTotalClicks(id);
+
+        assertThat(repository.findById(id).orElseThrow().getTotalClicks()).isEqualTo(2);
+    }
+
+    @Test
     void enforcesUniqueShortCode() {
         ShortUrl first = new ShortUrl("https://example.com/x", null);
         first.setShortCode("java");

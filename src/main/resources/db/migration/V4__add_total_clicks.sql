@@ -1,0 +1,1 @@
+ALTER TABLE short_urls ADD COLUMN total_clicks BIGINT NOT NULL DEFAULT 0;
