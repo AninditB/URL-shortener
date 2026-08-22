@@ -68,6 +68,11 @@ public class KafkaConfig {
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.aninditb.shortlink.analytics");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, ClickEvent.class.getName());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, ANALYTICS_CONSUMER_GROUP);
+        // A fresh/reset consumer group should replay from the beginning rather than silently
+        // skip any backlog - a missed click event is permanently lost analytics data with no
+        // visible symptom, whereas reprocessing a small backlog is harmless given the
+        // consumer's event-id dedup (EventDedupService).
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
