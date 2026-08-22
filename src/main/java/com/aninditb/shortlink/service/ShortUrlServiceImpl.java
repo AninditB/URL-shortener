@@ -1,5 +1,6 @@
 package com.aninditb.shortlink.service;
 
+import com.aninditb.shortlink.analytics.ClickEventPublisher;
 import com.aninditb.shortlink.dto.CreateShortUrlRequest;
 import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
@@ -37,17 +38,20 @@ public class ShortUrlServiceImpl implements ShortUrlService {
     private final ShortUrlRepository repository;
     private final UrlSafetyValidator validator;
     private final StringRedisTemplate redisTemplate;
+    private final ClickEventPublisher clickEventPublisher;
     private final String baseUrl;
 
     public ShortUrlServiceImpl(
             ShortUrlRepository repository,
             UrlSafetyValidator validator,
             StringRedisTemplate redisTemplate,
+            ClickEventPublisher clickEventPublisher,
             @Value("${app.base-url}") String baseUrl
     ) {
         this.repository = repository;
         this.validator = validator;
         this.redisTemplate = redisTemplate;
+        this.clickEventPublisher = clickEventPublisher;
         this.baseUrl = baseUrl;
     }
 
@@ -88,6 +92,7 @@ public class ShortUrlServiceImpl implements ShortUrlService {
         String cacheKey = cacheKey(shortCode);
         String cachedUrl = redisTemplate.opsForValue().get(cacheKey);
         if (cachedUrl != null) {
+            clickEventPublisher.publish(shortCode);
             return cachedUrl;
         }
 
@@ -106,6 +111,7 @@ public class ShortUrlServiceImpl implements ShortUrlService {
         }
 
         cacheActiveUrl(entity);
+        clickEventPublisher.publish(shortCode);
         return entity.getOriginalUrl();
     }
 

@@ -1,5 +1,6 @@
 package com.aninditb.shortlink.service;
 
+import com.aninditb.shortlink.analytics.ClickEventPublisher;
 import com.aninditb.shortlink.dto.CreateShortUrlRequest;
 import com.aninditb.shortlink.dto.PagedUrlResponse;
 import com.aninditb.shortlink.dto.ShortUrlResponse;
@@ -58,6 +59,9 @@ class ShortUrlServiceImplTest {
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private ClickEventPublisher clickEventPublisher;
 
     @InjectMocks
     private ShortUrlServiceImpl service;
@@ -163,6 +167,7 @@ class ShortUrlServiceImplTest {
 
         assertThat(resolved).isEqualTo("https://example.com/x");
         verify(repository, never()).findByShortCode(anyString());
+        verify(clickEventPublisher).publish("java");
     }
 
     @Test
@@ -176,6 +181,7 @@ class ShortUrlServiceImplTest {
 
         assertThat(resolved).isEqualTo("https://example.com/x");
         verify(valueOperations).set(eq("shortcode:java"), eq("https://example.com/x"), any());
+        verify(clickEventPublisher).publish("java");
     }
 
     @Test
@@ -201,6 +207,7 @@ class ShortUrlServiceImplTest {
         assertThat(entity.getStatus()).isEqualTo(UrlStatus.EXPIRED);
         verify(repository).save(entity);
         verify(redisTemplate).delete("shortcode:java");
+        verify(clickEventPublisher, never()).publish(anyString());
     }
 
     @Test
@@ -213,6 +220,7 @@ class ShortUrlServiceImplTest {
 
         assertThatThrownBy(() -> service.resolve("java"))
                 .isInstanceOf(UrlExpiredException.class);
+        verify(clickEventPublisher, never()).publish(anyString());
     }
 
     @Test
