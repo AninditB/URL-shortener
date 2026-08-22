@@ -43,6 +43,9 @@ public class ShortUrl {
     @Column(name = "owner_id")
     private Long ownerId;
 
+    @Column(name = "total_clicks", nullable = false)
+    private long totalClicks;
+
     protected ShortUrl() {
     }
 
@@ -108,5 +111,9 @@ public class ShortUrl {
 
     public void setOwnerId(Long ownerId) {
         this.ownerId = ownerId;
+    }
+
+    public long getTotalClicks() {
+        return totalClicks;
     }
 }
