@@ -55,13 +55,13 @@ public class ShortUrlController {
         }
 
         String bodyHash = IdempotencyService.hash(serialize(request));
-        Optional<ShortUrlResponse> existing = idempotencyService.findExisting(idempotencyKey, bodyHash);
+        Optional<ShortUrlResponse> existing = idempotencyService.claim(idempotencyKey, bodyHash);
         if (existing.isPresent()) {
             return ResponseEntity.status(201).body(existing.get());
         }
 
         ShortUrlResponse response = service.create(request);
-        idempotencyService.store(idempotencyKey, bodyHash, response);
+        idempotencyService.complete(idempotencyKey, bodyHash, response);
         return ResponseEntity.status(201).body(response);
     }
 

@@ -93,7 +93,7 @@ class ShortUrlControllerTest {
 
     @Test
     void createWithFreshIdempotencyKeyStoresResponse() throws Exception {
-        when(idempotencyService.findExisting(eq("key-1"), anyString())).thenReturn(Optional.empty());
+        when(idempotencyService.claim(eq("key-1"), anyString())).thenReturn(Optional.empty());
         when(service.create(any())).thenReturn(new ShortUrlResponse("java", "http://localhost:8080/java"));
 
         mockMvc.perform(post("/api/v1/urls")
@@ -103,13 +103,13 @@ class ShortUrlControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.shortCode").value("java"));
 
-        verify(idempotencyService).store(eq("key-1"), anyString(), any(ShortUrlResponse.class));
+        verify(idempotencyService).complete(eq("key-1"), anyString(), any(ShortUrlResponse.class));
     }
 
     @Test
     void createReplayedWithSameKeyAndBodyReturnsStoredResponseWithoutCallingService() throws Exception {
         ShortUrlResponse stored = new ShortUrlResponse("java", "http://localhost:8080/java");
-        when(idempotencyService.findExisting(eq("key-1"), anyString())).thenReturn(Optional.of(stored));
+        when(idempotencyService.claim(eq("key-1"), anyString())).thenReturn(Optional.of(stored));
 
         mockMvc.perform(post("/api/v1/urls")
                         .header("Idempotency-Key", "key-1")
@@ -123,7 +123,7 @@ class ShortUrlControllerTest {
 
     @Test
     void createReplayedWithSameKeyAndDifferentBodyReturns409() throws Exception {
-        when(idempotencyService.findExisting(eq("key-1"), anyString()))
+        when(idempotencyService.claim(eq("key-1"), anyString()))
                 .thenThrow(new IdempotencyConflictException("Idempotency-Key 'key-1' was already used with a different request body"));
 
         mockMvc.perform(post("/api/v1/urls")

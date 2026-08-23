@@ -19,6 +19,10 @@ import java.util.Optional;
 public class IdempotencyService {
 
     private static final String KEY_PREFIX = "idempotency:";
+    private static final String IN_PROGRESS_PREFIX = "IN_PROGRESS:";
+    private static final Duration RESERVATION_TTL = Duration.ofSeconds(30);
+    private static final int MAX_POLL_ATTEMPTS = 10;
+    private static final long POLL_INTERVAL_MS = 200;
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -34,23 +38,63 @@ public class IdempotencyService {
         this.ttl = Duration.ofHours(ttlHours);
     }
 
-    public Optional<ShortUrlResponse> findExisting(String idempotencyKey, String bodyHash) {
-        String stored = redisTemplate.opsForValue().get(key(idempotencyKey));
-        if (stored == null) {
+    // Atomically claims the key (Redis SETNX) before any work happens, closing the race where
+    // two concurrent requests with the same key both observed "not yet used" and both proceeded -
+    // empty means this call won the claim and must call complete(); a present value means a
+    // completed request with the same key+body already exists and its response should be reused.
+    public Optional<ShortUrlResponse> claim(String idempotencyKey, String bodyHash) {
+        String redisKey = key(idempotencyKey);
+        if (Boolean.TRUE.equals(redisTemplate.opsForValue()
+                .setIfAbsent(redisKey, IN_PROGRESS_PREFIX + bodyHash, RESERVATION_TTL))) {
             return Optional.empty();
         }
-
-        IdempotencyRecord record = deserialize(stored);
-        if (!record.bodyHash().equals(bodyHash)) {
-            throw new IdempotencyConflictException(
-                    "Idempotency-Key '" + idempotencyKey + "' was already used with a different request body");
-        }
-        return Optional.of(record.response());
+        return awaitCompletion(redisKey, bodyHash);
     }
 
-    public void store(String idempotencyKey, String bodyHash, ShortUrlResponse response) {
+    public void complete(String idempotencyKey, String bodyHash, ShortUrlResponse response) {
         String json = serialize(new IdempotencyRecord(bodyHash, response));
         redisTemplate.opsForValue().set(key(idempotencyKey), json, ttl);
+    }
+
+    // Someone else already claimed this key - wait briefly for them to finish rather than letting
+    // a second caller silently redo the work (the race this replaces).
+    private Optional<ShortUrlResponse> awaitCompletion(String redisKey, String bodyHash) {
+        for (int attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+            String stored = redisTemplate.opsForValue().get(redisKey);
+            if (stored == null) {
+                // the reservation vanished (TTL expired) without completing - try claiming it
+                if (Boolean.TRUE.equals(redisTemplate.opsForValue()
+                        .setIfAbsent(redisKey, IN_PROGRESS_PREFIX + bodyHash, RESERVATION_TTL))) {
+                    return Optional.empty();
+                }
+            } else if (stored.startsWith(IN_PROGRESS_PREFIX)) {
+                if (!stored.substring(IN_PROGRESS_PREFIX.length()).equals(bodyHash)) {
+                    throw conflict();
+                }
+            } else {
+                IdempotencyRecord record = deserialize(stored);
+                if (!record.bodyHash().equals(bodyHash)) {
+                    throw conflict();
+                }
+                return Optional.of(record.response());
+            }
+            sleep();
+        }
+        throw new IdempotencyConflictException(
+                "A request with this Idempotency-Key is still being processed; retry shortly");
+    }
+
+    private static void sleep() {
+        try {
+            Thread.sleep(POLL_INTERVAL_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for idempotent request to complete", e);
+        }
+    }
+
+    private static IdempotencyConflictException conflict() {
+        return new IdempotencyConflictException("Idempotency-Key was already used with a different request body");
     }
 
     public static String hash(String requestBody) {
