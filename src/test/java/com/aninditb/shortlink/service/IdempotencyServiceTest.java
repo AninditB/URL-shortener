@@ -35,36 +35,56 @@ class IdempotencyServiceTest {
     }
 
     @Test
-    void findExistingReturnsEmptyWhenNoStoredValue() {
-        when(valueOperations.get("idempotency:abc")).thenReturn(null);
+    void claimReturnsEmptyWhenThisCallWinsTheReservation() {
+        when(valueOperations.setIfAbsent(eq("idempotency:abc"), eq("IN_PROGRESS:hash1"), any(Duration.class)))
+                .thenReturn(true);
 
-        assertThat(idempotencyService.findExisting("abc", "hash1")).isEmpty();
+        assertThat(idempotencyService.claim("abc", "hash1")).isEmpty();
     }
 
     @Test
-    void findExistingReturnsStoredResponseWhenHashMatches() {
+    void claimReturnsStoredResponseWhenCompletedAndHashMatches() {
         ShortUrlResponse response = new ShortUrlResponse("java", "http://localhost:8080/java");
         String stored = storedJsonFor("hash1", response);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
         when(valueOperations.get("idempotency:abc")).thenReturn(stored);
 
-        Optional<ShortUrlResponse> result = idempotencyService.findExisting("abc", "hash1");
-
-        assertThat(result).contains(response);
+        assertThat(idempotencyService.claim("abc", "hash1")).contains(response);
     }
 
     @Test
-    void findExistingThrowsWhenHashDiffers() {
+    void claimThrowsWhenCompletedHashDiffers() {
         ShortUrlResponse response = new ShortUrlResponse("java", "http://localhost:8080/java");
         String stored = storedJsonFor("hash1", response);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
         when(valueOperations.get("idempotency:abc")).thenReturn(stored);
 
-        assertThatThrownBy(() -> idempotencyService.findExisting("abc", "different-hash"))
+        assertThatThrownBy(() -> idempotencyService.claim("abc", "different-hash"))
                 .isInstanceOf(IdempotencyConflictException.class);
     }
 
     @Test
-    void storeWritesValueWithConfiguredTtl() {
-        idempotencyService.store("abc", "hash1", new ShortUrlResponse("java", "http://localhost:8080/java"));
+    void claimThrowsWhenAnotherRequestIsInProgressWithADifferentHash() {
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+        when(valueOperations.get("idempotency:abc")).thenReturn("IN_PROGRESS:other-hash");
+
+        assertThatThrownBy(() -> idempotencyService.claim("abc", "hash1"))
+                .isInstanceOf(IdempotencyConflictException.class);
+    }
+
+    @Test
+    void claimPollsUntilAConcurrentInProgressRequestCompletes() {
+        ShortUrlResponse response = new ShortUrlResponse("java", "http://localhost:8080/java");
+        String completed = storedJsonFor("hash1", response);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+        when(valueOperations.get("idempotency:abc")).thenReturn("IN_PROGRESS:hash1", completed);
+
+        assertThat(idempotencyService.claim("abc", "hash1")).contains(response);
+    }
+
+    @Test
+    void completeWritesValueWithConfiguredTtl() {
+        idempotencyService.complete("abc", "hash1", new ShortUrlResponse("java", "http://localhost:8080/java"));
 
         verify(valueOperations).set(eq("idempotency:abc"), anyString(), eq(Duration.ofHours(24)));
     }
@@ -80,7 +100,7 @@ class IdempotencyServiceTest {
     }
 
     private String storedJsonFor(String bodyHash, ShortUrlResponse response) {
-        idempotencyService.store("abc", bodyHash, response);
+        idempotencyService.complete("abc", bodyHash, response);
         var captor = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(valueOperations).set(eq("idempotency:abc"), captor.capture(), any(Duration.class));
         return captor.getValue();
