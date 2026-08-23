@@ -14,6 +14,8 @@ const createResult = document.getElementById('create-result');
 const createResultUrl = document.getElementById('create-result-url');
 const copyBtn = document.getElementById('copy-btn');
 const openBtn = document.getElementById('open-btn');
+const urlTableBody = document.getElementById('url-table-body');
+const loadMoreBtn = document.getElementById('load-more-btn');
 
 function showError(message) {
   toastMessage.textContent = message;
@@ -28,6 +30,7 @@ function showDashboard(email) {
   authView.classList.add('hidden');
   dashboardView.classList.remove('hidden');
   userEmailSpan.textContent = email;
+  resetList();
 }
 
 function showAuth() {
@@ -105,6 +108,7 @@ createForm.addEventListener('submit', async (event) => {
     openBtn.href = response.shortUrl;
     createResult.classList.remove('hidden');
     createIdempotencyKey = crypto.randomUUID();
+    resetList();
   } catch (err) {
     showError(err.message);
   }
@@ -112,6 +116,81 @@ createForm.addEventListener('submit', async (event) => {
 
 copyBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(createResultUrl.textContent);
+});
+
+let nextCursor = null;
+
+function escapeHtml(value) {
+  const div = document.createElement('div');
+  div.textContent = value;
+  return div.innerHTML;
+}
+
+function truncate(value, max) {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+function appendRow(item) {
+  const tr = document.createElement('tr');
+  tr.dataset.id = item.id;
+  const shortUrl = `${API_BASE}/${item.shortCode}`;
+  tr.innerHTML = `
+    <td><a href="${shortUrl}" target="_blank" rel="noopener">${item.shortCode}</a></td>
+    <td title="${escapeHtml(item.originalUrl)}">${escapeHtml(truncate(item.originalUrl, 40))}</td>
+    <td>${item.status}</td>
+    <td>${new Date(item.createdAt).toLocaleString()}</td>
+    <td>${item.expiresAt ? new Date(item.expiresAt).toLocaleString() : '-'}</td>
+    <td class="actions">
+      <button type="button" class="analytics-btn">Analytics</button>
+      <button type="button" class="disable-btn">Disable</button>
+      <button type="button" class="delete-btn">Delete</button>
+    </td>`;
+  urlTableBody.appendChild(tr);
+}
+
+async function loadUrls(cursor) {
+  try {
+    const page = await listUrls(20, cursor);
+    page.items.forEach(appendRow);
+    nextCursor = page.nextCursor;
+    loadMoreBtn.classList.toggle('hidden', !nextCursor);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+function resetList() {
+  urlTableBody.innerHTML = '';
+  nextCursor = null;
+  loadUrls(null);
+}
+
+loadMoreBtn.addEventListener('click', () => loadUrls(nextCursor));
+
+urlTableBody.addEventListener('click', async (event) => {
+  const row = event.target.closest('tr');
+  if (!row) {
+    return;
+  }
+  const id = row.dataset.id;
+
+  if (event.target.classList.contains('disable-btn')) {
+    try {
+      await disableUrl(id);
+      row.children[2].textContent = 'DISABLED';
+    } catch (err) {
+      showError(err.message);
+    }
+  } else if (event.target.classList.contains('delete-btn')) {
+    if (confirm('Delete this URL?')) {
+      try {
+        await deleteUrl(id);
+        row.remove();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+  }
 });
 
 const storedToken = getToken();
