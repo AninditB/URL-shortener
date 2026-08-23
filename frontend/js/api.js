@@ -77,3 +77,19 @@ function createUrl({ originalUrl, customAlias, expiresAt }, idempotencyKey) {
     })
   });
 }
+
+function listUrls(limit, cursor) {
+  const params = new URLSearchParams({ limit });
+  if (cursor) {
+    params.set('cursor', cursor);
+  }
+  return apiFetch(`/api/v1/urls?${params}`);
+}
+
+function disableUrl(id) {
+  return apiFetch(`/api/v1/urls/${id}/disable`, { method: 'POST' });
+}
+
+function deleteUrl(id) {
+  return apiFetch(`/api/v1/urls/${id}`, { method: 'DELETE' });
+}
