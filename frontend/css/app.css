@@ -195,3 +195,46 @@ td.actions button {
 #load-more-btn {
   margin-top: 1rem;
 }
+
+/* Analytics modal */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 1.5rem 2rem;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.25rem;
+  padding: 0;
+}
+
+.modal h3 {
+  margin-bottom: 0.25rem;
+  font-size: 1rem;
+}
+
+.modal table {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
