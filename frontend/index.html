@@ -42,6 +42,56 @@
         <button type="submit">Register</button>
       </form>
     </section>
+
+    <section id="dashboard-view" class="hidden">
+      <header class="dashboard-header">
+        <h1>ShortLink</h1>
+        <div class="user-info">
+          <span id="user-email"></span>
+          <button id="logout-btn" type="button">Log out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Create a short URL</h2>
+        <form id="create-form">
+          <label for="create-original-url">URL to shorten</label>
+          <input id="create-original-url" type="url" required placeholder="https://example.com/...">
+
+          <label for="create-alias">Custom alias (optional)</label>
+          <input id="create-alias" type="text" pattern="[A-Za-z0-9_-]{3,32}" placeholder="my-link">
+
+          <label for="create-expires">Expires (optional)</label>
+          <input id="create-expires" type="datetime-local">
+
+          <button type="submit">Create</button>
+        </form>
+
+        <div id="create-result" class="create-result hidden">
+          <span id="create-result-url"></span>
+          <button id="copy-btn" type="button">Copy</button>
+          <a id="open-btn" href="#" target="_blank" rel="noopener">Open</a>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Your URLs</h2>
+        <table id="url-table">
+          <thead>
+            <tr>
+              <th>Short link</th>
+              <th>Original URL</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Expires</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="url-table-body"></tbody>
+        </table>
+        <button id="load-more-btn" class="hidden" type="button">Load more</button>
+      </section>
+    </section>
   </main>
 
   <script src="js/api.js" defer></script>
