@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShortLink</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="toast" class="toast hidden" role="alert">
+    <span id="toast-message"></span>
+    <button id="toast-close" class="toast-close" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <main>
+    <section id="auth-view">
+      <h1>ShortLink</h1>
+
+      <div class="auth-tabs">
+        <button id="show-login" class="tab-btn active" type="button">Log in</button>
+        <button id="show-register" class="tab-btn" type="button">Register</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email" required autocomplete="email">
+
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" required autocomplete="current-password">
+
+        <button type="submit">Log in</button>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <label for="register-email">Email</label>
+        <input id="register-email" type="email" required autocomplete="email">
+
+        <label for="register-password">Password</label>
+        <input id="register-password" type="password" required minlength="8" maxlength="72"
+               autocomplete="new-password">
+
+        <button type="submit">Register</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="js/api.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>
