@@ -65,3 +65,15 @@ function login(email, password) {
     body: JSON.stringify({ email, password })
   });
 }
+
+function createUrl({ originalUrl, customAlias, expiresAt }, idempotencyKey) {
+  return apiFetch('/api/v1/urls', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({
+      originalUrl,
+      customAlias: customAlias || null,
+      expiresAt: expiresAt || null
+    })
+  });
+}

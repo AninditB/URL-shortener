@@ -9,6 +9,11 @@ const logoutBtn = document.getElementById('logout-btn');
 const toast = document.getElementById('toast');
 const toastMessage = document.getElementById('toast-message');
 const toastCloseBtn = document.getElementById('toast-close');
+const createForm = document.getElementById('create-form');
+const createResult = document.getElementById('create-result');
+const createResultUrl = document.getElementById('create-result-url');
+const copyBtn = document.getElementById('copy-btn');
+const openBtn = document.getElementById('open-btn');
 
 function showError(message) {
   toastMessage.textContent = message;
@@ -78,6 +83,35 @@ registerForm.addEventListener('submit', async (event) => {
 logoutBtn.addEventListener('click', () => {
   clearSession();
   showAuth();
+});
+
+// Reused across repeated submits of the same form state, so a rapid
+// double-click hits the server's idempotency cache instead of creating two
+// rows; regenerated only after a successful create.
+let createIdempotencyKey = crypto.randomUUID();
+
+createForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  hideError();
+
+  const originalUrl = document.getElementById('create-original-url').value;
+  const customAlias = document.getElementById('create-alias').value;
+  const expiresInput = document.getElementById('create-expires').value;
+  const expiresAt = expiresInput ? new Date(expiresInput).toISOString() : null;
+
+  try {
+    const response = await createUrl({ originalUrl, customAlias, expiresAt }, createIdempotencyKey);
+    createResultUrl.textContent = response.shortUrl;
+    openBtn.href = response.shortUrl;
+    createResult.classList.remove('hidden');
+    createIdempotencyKey = crypto.randomUUID();
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+copyBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(createResultUrl.textContent);
 });
 
 const storedToken = getToken();
