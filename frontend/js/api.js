@@ -93,3 +93,7 @@ function disableUrl(id) {
 function deleteUrl(id) {
   return apiFetch(`/api/v1/urls/${id}`, { method: 'DELETE' });
 }
+
+function getAnalytics(id) {
+  return apiFetch(`/api/v1/urls/${id}/analytics`);
+}

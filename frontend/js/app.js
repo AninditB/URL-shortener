@@ -16,6 +16,12 @@ const copyBtn = document.getElementById('copy-btn');
 const openBtn = document.getElementById('open-btn');
 const urlTableBody = document.getElementById('url-table-body');
 const loadMoreBtn = document.getElementById('load-more-btn');
+const analyticsModal = document.getElementById('analytics-modal');
+const analyticsCloseBtn = document.getElementById('analytics-close-btn');
+const analyticsTotalClicks = document.getElementById('analytics-total-clicks');
+const analyticsDailyBody = document.getElementById('analytics-daily-table').querySelector('tbody');
+const analyticsCountriesBody = document.getElementById('analytics-countries-table').querySelector('tbody');
+const analyticsDevicesBody = document.getElementById('analytics-devices-table').querySelector('tbody');
 
 function showError(message) {
   toastMessage.textContent = message;
@@ -174,7 +180,9 @@ urlTableBody.addEventListener('click', async (event) => {
   }
   const id = row.dataset.id;
 
-  if (event.target.classList.contains('disable-btn')) {
+  if (event.target.classList.contains('analytics-btn')) {
+    openAnalytics(id);
+  } else if (event.target.classList.contains('disable-btn')) {
     try {
       await disableUrl(id);
       row.children[2].textContent = 'DISABLED';
@@ -190,6 +198,40 @@ urlTableBody.addEventListener('click', async (event) => {
         showError(err.message);
       }
     }
+  }
+});
+
+function renderMapTable(tbody, map) {
+  tbody.innerHTML = '';
+  Object.entries(map).forEach(([key, value]) => {
+    const tr = document.createElement('tr');
+    const keyTd = document.createElement('td');
+    keyTd.textContent = key;
+    const valueTd = document.createElement('td');
+    valueTd.textContent = value;
+    tr.append(keyTd, valueTd);
+    tbody.appendChild(tr);
+  });
+}
+
+async function openAnalytics(id) {
+  try {
+    const analytics = await getAnalytics(id);
+    analyticsTotalClicks.textContent = analytics.totalClicks;
+    renderMapTable(analyticsDailyBody, analytics.clicksByDay);
+    renderMapTable(analyticsCountriesBody, analytics.topCountries);
+    renderMapTable(analyticsDevicesBody, analytics.devices);
+    analyticsModal.classList.remove('hidden');
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+analyticsCloseBtn.addEventListener('click', () => analyticsModal.classList.add('hidden'));
+
+analyticsModal.addEventListener('click', (event) => {
+  if (event.target === analyticsModal) {
+    analyticsModal.classList.add('hidden');
   }
 });
 
