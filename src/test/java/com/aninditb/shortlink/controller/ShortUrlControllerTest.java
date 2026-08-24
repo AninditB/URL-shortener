@@ -8,6 +8,7 @@ import com.aninditb.shortlink.dto.UrlDetailsResponse;
 import com.aninditb.shortlink.exception.AliasAlreadyExistsException;
 import com.aninditb.shortlink.exception.ForbiddenException;
 import com.aninditb.shortlink.exception.IdempotencyConflictException;
+import com.aninditb.shortlink.exception.UrlExpiredException;
 import com.aninditb.shortlink.exception.UrlNotFoundException;
 import com.aninditb.shortlink.service.IdempotencyService;
 import com.aninditb.shortlink.service.JwtService;
@@ -205,6 +206,32 @@ class ShortUrlControllerTest {
         mockMvc.perform(post("/api/v1/urls/42/disable"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void enableReturns204() throws Exception {
+        mockMvc.perform(post("/api/v1/urls/42/enable"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void enableWhenNotOwnerReturns403() throws Exception {
+        doThrow(new ForbiddenException("You do not have permission to modify this URL"))
+                .when(service).enable(42L);
+
+        mockMvc.perform(post("/api/v1/urls/42/enable"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void enableOnExpiredUrlReturns410() throws Exception {
+        doThrow(new UrlExpiredException("URL for id 42 has expired and cannot be re-enabled"))
+                .when(service).enable(42L);
+
+        mockMvc.perform(post("/api/v1/urls/42/enable"))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.status").value(410));
     }
 
     @Test

@@ -148,7 +148,9 @@ function appendRow(item) {
     <td>${item.expiresAt ? new Date(item.expiresAt).toLocaleString() : '-'}</td>
     <td class="actions">
       <button type="button" class="analytics-btn">Analytics</button>
-      <button type="button" class="disable-btn">Disable</button>
+      ${item.status === 'DISABLED'
+        ? '<button type="button" class="enable-btn">Enable</button>'
+        : '<button type="button" class="disable-btn">Disable</button>'}
       <button type="button" class="delete-btn">Delete</button>
     </td>`;
   urlTableBody.appendChild(tr);
@@ -186,6 +188,17 @@ urlTableBody.addEventListener('click', async (event) => {
     try {
       await disableUrl(id);
       row.children[2].textContent = 'DISABLED';
+      event.target.classList.replace('disable-btn', 'enable-btn');
+      event.target.textContent = 'Enable';
+    } catch (err) {
+      showError(err.message);
+    }
+  } else if (event.target.classList.contains('enable-btn')) {
+    try {
+      await enableUrl(id);
+      row.children[2].textContent = 'ACTIVE';
+      event.target.classList.replace('enable-btn', 'disable-btn');
+      event.target.textContent = 'Disable';
     } catch (err) {
       showError(err.message);
     }

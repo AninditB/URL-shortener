@@ -90,6 +90,10 @@ function disableUrl(id) {
   return apiFetch(`/api/v1/urls/${id}/disable`, { method: 'POST' });
 }
 
+function enableUrl(id) {
+  return apiFetch(`/api/v1/urls/${id}/enable`, { method: 'POST' });
+}
+
 function deleteUrl(id) {
   return apiFetch(`/api/v1/urls/${id}`, { method: 'DELETE' });
 }
