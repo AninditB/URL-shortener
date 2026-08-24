@@ -384,6 +384,115 @@ class ShortUrlServiceImplTest {
     }
 
     @Test
+    void enableThrowsNotFoundWhenMissing() {
+        when(repository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.enable(1L))
+                .isInstanceOf(UrlNotFoundException.class);
+    }
+
+    @Test
+    void enableByOwnerReactivatesDisabledUrl() {
+        authenticateAs(5L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.DISABLED);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(repository.save(entity)).thenReturn(entity);
+
+        service.enable(1L);
+
+        assertThat(entity.getStatus()).isEqualTo(UrlStatus.ACTIVE);
+        verify(repository).save(entity);
+    }
+
+    @Test
+    void enableOnAlreadyActiveUrlIsIdempotent() {
+        authenticateAs(5L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.ACTIVE);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(repository.save(entity)).thenReturn(entity);
+
+        service.enable(1L);
+
+        assertThat(entity.getStatus()).isEqualTo(UrlStatus.ACTIVE);
+    }
+
+    @Test
+    void enableOnExpiredUrlThrowsExpired() {
+        authenticateAs(5L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", Instant.now().minus(1, ChronoUnit.DAYS));
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.EXPIRED);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.enable(1L))
+                .isInstanceOf(UrlExpiredException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void enableByNonOwnerThrowsForbidden() {
+        authenticateAs(6L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.DISABLED);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.enable(1L))
+                .isInstanceOf(ForbiddenException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void enableByAdminSucceedsRegardlessOfOwnership() {
+        authenticateAs(6L, "ADMIN");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.DISABLED);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(repository.save(entity)).thenReturn(entity);
+
+        service.enable(1L);
+
+        assertThat(entity.getStatus()).isEqualTo(UrlStatus.ACTIVE);
+    }
+
+    @Test
+    void enableOnDisabledUrlWithPastExpiryThrowsExpired() {
+        // Expiry is detected lazily elsewhere (resolve()/getDetails()), so a DISABLED row can
+        // carry a past expiresAt without ever having been flipped to EXPIRED - enable() must
+        // check the timestamp itself, not just the stored status, or this would "succeed" only
+        // to be re-detected as expired and flipped right back on the very next read.
+        authenticateAs(5L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", Instant.now().minus(1, ChronoUnit.DAYS));
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.DISABLED);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.enable(1L))
+                .isInstanceOf(UrlExpiredException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void listOwnUrlsWithoutCursorUsesNoCursorQuery() {
         authenticateAs(9L, "USER");
         when(repository.findByOwnerIdOrderByIdDesc(eq(9L), any())).thenReturn(List.of());

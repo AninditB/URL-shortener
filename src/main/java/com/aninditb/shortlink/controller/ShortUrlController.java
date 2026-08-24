@@ -98,6 +98,12 @@ public class ShortUrlController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/enable")
+    public ResponseEntity<Void> enable(@PathVariable Long id) {
+        service.enable(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/analytics")
     public ResponseEntity<AnalyticsResponse> getAnalytics(@PathVariable Long id) {
         return ResponseEntity.ok(analyticsService.getAnalytics(id));

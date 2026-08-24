@@ -156,6 +156,26 @@ public class ShortUrlServiceImpl implements ShortUrlService {
     }
 
     @Override
+    @Transactional
+    public void enable(Long id) {
+        ShortUrl entity = repository.findById(id)
+                .orElseThrow(() -> new UrlNotFoundException("No URL found for id " + id));
+
+        requireOwnerOrAdmin(entity);
+
+        // Checked by expiresAt, not the stored status: expiry is detected lazily elsewhere
+        // (resolve()/getDetails()), so a DISABLED row can have a past expiresAt without ever
+        // having been flipped to EXPIRED yet. Enabling it would "succeed" here only to be
+        // re-detected as expired and flipped right back on the very next read.
+        if (expired(entity)) {
+            throw new UrlExpiredException("URL for id " + id + " has expired and cannot be re-enabled");
+        }
+
+        entity.setStatus(UrlStatus.ACTIVE);
+        repository.save(entity);
+    }
+
+    @Override
     public PagedUrlResponse listOwnUrls(int limit, Long cursor) {
         Long ownerId = currentUserId();
         int effectiveLimit = Math.min(Math.max(limit, 1), 100);

@@ -17,5 +17,7 @@ public interface ShortUrlService {
 
     void disable(Long id);
 
+    void enable(Long id);
+
     PagedUrlResponse listOwnUrls(int limit, Long cursor);
 }
