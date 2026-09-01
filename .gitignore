@@ -25,3 +25,7 @@ replay_pid*
 
 # Local-only planning docs: roadmap, SRS, design documents (kept local, not tracked)
 docs/planning/
+
+# Local-only Claude Code working files: ticket tracker and project instructions
+.claude/
+CLAUDE.md
