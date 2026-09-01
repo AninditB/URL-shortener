@@ -28,14 +28,6 @@ Then pick either path — both talk to the same backend and the same data:
 
 Both paths are verified working end-to-end (create → disable → enable → redirect → analytics), most recently checked 2026-08-24. Full prerequisites and config reference: [Getting Started](#getting-started).
 
-## Use Cases
-
-* **Share a memorable link with analytics** — shorten a long campaign/marketing URL, optionally with your own custom alias, and watch click volume, top countries, and device breakdown roll in automatically as people click it.
-* **Time-boxed links** — set an expiration timestamp on creation for a link that should stop working on its own (a promo, a one-time invite) without you having to remember to take it down.
-* **Reversible takedown** — disable a link without losing it (e.g. while investigating a report, or pausing a campaign), then re-enable it later if you need it back.
-* **Programmatic integration** — create/manage links from your own app or script via the REST API instead of the webpage; the `Idempotency-Key` header means a retried request never creates a duplicate link.
-* **A worked example of the patterns it's built on** — cache-aside redirects, JWT auth, distributed rate limiting, idempotent APIs, and event-driven analytics via Kafka, all in one small, readable codebase. See [Engineering Details](#engineering-details) and the [System Design Document](docs/SYSTEM-DESIGN.md).
-
 ## Features
 
 * Create a short URL, with optional custom alias and expiration
