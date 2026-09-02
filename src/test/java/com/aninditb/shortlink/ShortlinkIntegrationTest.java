@@ -27,6 +27,7 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -121,6 +122,56 @@ class ShortlinkIntegrationTest {
 
         mockMvc.perform(get("/" + shortCode))
                 .andExpect(status().isGone());
+    }
+
+    @Test
+    void getUrlDetailsRequiresOwnership() throws Exception {
+        String ownerEmail = "integration-details-owner-" + System.nanoTime() + "@example.com";
+        String otherEmail = "integration-details-other-" + System.nanoTime() + "@example.com";
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("{\"email\":\"" + ownerEmail + "\",\"password\":\"integration-pw\"}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("{\"email\":\"" + otherEmail + "\",\"password\":\"integration-pw\"}"))
+                .andExpect(status().isCreated());
+
+        String ownerToken = login(ownerEmail);
+        String otherToken = login(otherEmail);
+
+        String createJson = mockMvc.perform(post("/api/v1/urls")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType("application/json")
+                        .content("{\"originalUrl\":\"https://example.com/details-integration-test\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String shortCode = objectMapper.readValue(createJson, ShortUrlResponse.class).shortCode();
+
+        String listJson = mockMvc.perform(get("/api/v1/urls").header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Long id = objectMapper.readValue(listJson, PagedUrlResponse.class).items().get(0).id();
+
+        mockMvc.perform(get("/api/v1/urls/" + id))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/urls/" + id).header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/urls/" + id).header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shortCode").value(shortCode));
+    }
+
+    private String login(String email) throws Exception {
+        String loginJson = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType("application/json")
+                        .content("{\"email\":\"" + email + "\",\"password\":\"integration-pw\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readValue(loginJson, TokenResponse.class).token();
     }
 
     @Test

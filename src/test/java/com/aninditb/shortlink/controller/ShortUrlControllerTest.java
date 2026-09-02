@@ -177,6 +177,16 @@ class ShortUrlControllerTest {
     }
 
     @Test
+    void getDetailsWhenNotOwnerReturns403() throws Exception {
+        when(service.getDetails(eq(42L)))
+                .thenThrow(new ForbiddenException("You do not have permission to modify this URL"));
+
+        mockMvc.perform(get("/api/v1/urls/42"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
     void deleteReturns204() throws Exception {
         mockMvc.perform(delete("/api/v1/urls/42"))
                 .andExpect(status().isNoContent());

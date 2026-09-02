@@ -251,6 +251,49 @@ class ShortUrlServiceImplTest {
     }
 
     @Test
+    void getDetailsByOwnerSucceeds() {
+        authenticateAs(5L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.ACTIVE);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        UrlDetailsResponse response = service.getDetails(1L);
+
+        assertThat(response.shortCode()).isEqualTo("java");
+    }
+
+    @Test
+    void getDetailsByNonOwnerThrowsForbidden() {
+        authenticateAs(6L, "USER");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.getDetails(1L))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void getDetailsByAdminSucceedsRegardlessOfOwnership() {
+        authenticateAs(6L, "ADMIN");
+        ShortUrl entity = new ShortUrl("https://example.com/x", null);
+        entity.setShortCode("java");
+        entity.setStatus(UrlStatus.ACTIVE);
+        entity.setOwnerId(5L);
+        setId(entity, 1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+
+        UrlDetailsResponse response = service.getDetails(1L);
+
+        assertThat(response.shortCode()).isEqualTo("java");
+    }
+
+    @Test
     void deleteThrowsNotFoundWhenMissing() {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 

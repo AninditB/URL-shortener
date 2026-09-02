@@ -121,6 +121,8 @@ public class ShortUrlServiceImpl implements ShortUrlService {
         ShortUrl entity = repository.findById(id)
                 .orElseThrow(() -> new UrlNotFoundException("No URL found for id " + id));
 
+        requireOwnerOrAdmin(entity);
+
         if (expired(entity)) {
             entity.setStatus(UrlStatus.EXPIRED);
             entity = repository.save(entity);
