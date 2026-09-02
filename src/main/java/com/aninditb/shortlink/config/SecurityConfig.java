@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/urls/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/urls/*/disable").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/urls").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/urls/*").authenticated()
                         // Everything else stays permitAll for now; ownership itself is enforced
                         // in ShortUrlServiceImpl once a caller is authenticated.
                         .anyRequest().permitAll()

@@ -113,7 +113,7 @@ The app is entirely environment-variable driven, defaulting to the Docker Compos
 | POST | `/api/v1/auth/login` | Log in, receive a JWT | None |
 | POST | `/api/v1/urls` | Create a short URL (accepts optional `Idempotency-Key` header) | Optional |
 | GET | `/{shortCode}` | Redirect to the original URL | None |
-| GET | `/api/v1/urls/{id}` | Get URL details | None |
+| GET | `/api/v1/urls/{id}` | Get URL details (owner/admin only) | Required if owned |
 | GET | `/api/v1/urls?limit=&cursor=` | List the caller's own URLs, paginated | Required |
 | POST | `/api/v1/urls/{id}/disable` | Disable a URL without deleting it (owner/admin only) | Required if owned |
 | POST | `/api/v1/urls/{id}/enable` | Re-enable a disabled URL (owner/admin only) | Required if owned |
