@@ -1,5 +1,5 @@
 server:
-  port: ${PORT:8080}
+  port: 8080
 
 spring:
   application:
@@ -12,7 +12,6 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
-      password: ${SPRING_DATA_REDIS_PASSWORD:}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     admin:
