@@ -424,17 +424,17 @@ erDiagram
         bigint total_clicks
     }
     URL_CLICK_DAILY {
-        bigint short_url_id PK_FK
+        bigint short_url_id PK, FK
         date click_date PK
         bigint click_count
     }
     URL_CLICK_COUNTRY {
-        bigint short_url_id PK_FK
+        bigint short_url_id PK, FK
         varchar country PK
         bigint click_count
     }
     URL_CLICK_DEVICE {
-        bigint short_url_id PK_FK
+        bigint short_url_id PK, FK
         varchar device_type PK
         bigint click_count
     }
