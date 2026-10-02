@@ -120,7 +120,7 @@ The app is entirely environment-variable driven, defaulting to the Docker Compos
 | DELETE | `/api/v1/urls/{id}` | Delete a URL (owner/admin only) | Required if owned |
 | GET | `/api/v1/urls/{id}/analytics` | Total clicks, daily/country/device breakdown | Required if owned |
 
-Protected/ownership-gated actions use a standard `Authorization: Bearer <token>` header. Every error response shares one shape (`timestamp`, `status`, `error`, `message`, `path`), so one handler on the caller's side covers all of them. Full schemas: Swagger UI, or the [System Design Document](docs/SYSTEM-DESIGN.md#2-functional-requirements).
+Protected/ownership-gated actions use a standard `Authorization: Bearer <token>` header. Every error response shares one shape (`timestamp`, `status`, `error`, `message`, `path`), so one handler on the caller's side covers all of them. Full schemas: Swagger UI, or the [System Design Document](docs/requirements/functional.md).
 
 ## License
 
@@ -130,7 +130,7 @@ TBD (leaning MIT)
 
 ## Engineering Details
 
-The rest of this document is for anyone evaluating or extending the codebase, not just using it. For the full architecture — sequence diagrams, database ER diagram, caching strategy, code walkthroughs — see the [System Design Document](docs/SYSTEM-DESIGN.md).
+The rest of this document is for anyone evaluating or extending the codebase, not just using it. For the full architecture — sequence diagrams, database ER diagram, caching strategy, code walkthroughs — see the [System Design Document](docs/00-index.md).
 
 ### Roadmap
 
@@ -150,7 +150,7 @@ Frontend demo (plain HTML/CSS/vanilla JS, `frontend/`) is also complete.
 * **Phase 2 — Complete.** Caching, auth, rate limiting, idempotency, verified against real PostgreSQL + Redis (Testcontainers).
 * **Phase 3 — Complete.** Kafka click pipeline, idempotent analytics consumer, per-URL analytics endpoint, verified against real PostgreSQL + Redis + Kafka (Testcontainers).
 * **Frontend demo — Complete.** Full user flow (auth → create/list/disable/enable/delete → analytics) working end-to-end against a live backend.
-* Two bugs found post-hoc via manual/real-infra testing, both fixed: a check-then-act race condition in the idempotency service (atomic Redis reservation pattern), and a missing enable/reactivate action for disabled URLs (with an expiry-detection edge case caught during that fix's own verification). See [System Design Document § Code](docs/SYSTEM-DESIGN.md#6-code).
+* Two bugs found post-hoc via manual/real-infra testing, both fixed: a check-then-act race condition in the idempotency service (atomic Redis reservation pattern), and a missing enable/reactivate action for disabled URLs (with an expiry-detection edge case caught during that fix's own verification). See [System Design Document § Code](docs/implementation/code.md).
 
 Zero open issues/PRs; `main` is the only branch.
 
