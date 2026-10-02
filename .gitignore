@@ -23,8 +23,13 @@
 hs_err_pid*
 replay_pid*
 
-# Local-only planning docs: roadmap, SRS, design documents (kept local, not tracked)
-docs/planning/
+# Local-only internal docs (kept local, not tracked): planning (roadmap, SRS,
+# design documents), performance-testing scripts, and personal/working notes.
+# Public, tracked docs live in docs/.
+docs_I/
+
+# Obsidian vault settings (per-user editor state, e.g. from opening docs/ as a vault)
+.obsidian/
 
 # Local-only Claude Code working files: ticket tracker and project instructions
 .claude/
